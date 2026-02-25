@@ -1,0 +1,135 @@
+import { Q1_TOYS } from "../data/toys";
+import { FIT_MATRIX as Q1_FIT_MATRIX } from "../data/fitMatrix";
+import { Q2_TOYS } from "../data/q2Toys";
+import { Q2_FIT_MATRIX } from "../data/q2FitMatrix";
+import { Q3_TOYS } from "../data/q3Toys";
+import { Q3_FIT_MATRIX } from "../data/q3FitMatrix";
+import { Q4_TOYS } from "../data/q4Toys";
+import { Q4_FIT_MATRIX } from "../data/q4FitMatrix";
+
+function round2(n) {
+  return Math.round(n * 100) / 100;
+}
+
+export function calculateMarket(teams, quarter) {
+  const currentQuarter = String(quarter);
+
+  let TOYS;
+  let FIT_MATRIX;
+
+  if (currentQuarter === "2") {
+    TOYS = Q2_TOYS;
+    FIT_MATRIX = Q2_FIT_MATRIX;
+  } else if (currentQuarter === "3") {
+    TOYS = Q3_TOYS;
+    FIT_MATRIX = Q3_FIT_MATRIX;
+  } else if (currentQuarter === "4") {
+    TOYS = Q4_TOYS;
+    FIT_MATRIX = Q4_FIT_MATRIX;
+  } else {
+    TOYS = Q1_TOYS;
+    FIT_MATRIX = Q1_FIT_MATRIX;
+  }
+
+  const results = {};
+
+  // Initialize results
+  teams.forEach((team) => {
+    results[team.id] = {
+      baseRevenue: 0,
+      buildingRevenue: 0,
+      finalRevenue: 0,
+      sold: {}
+    };
+  });
+
+  TOYS.forEach((toy) => {
+    const totalSupply = teams.reduce(
+      (sum, team) => sum + (team.orders[toy.id] || 0),
+      0
+    );
+
+    const adjustedTotalSupply = totalSupply + 1;
+
+    teams.forEach((team) => {
+      const teamOrder = team.orders[toy.id] || 0;
+
+      // ---- DEMAND SPLIT ----
+
+      const share = teamOrder / adjustedTotalSupply;
+
+      // Step 1: base sold (rounded)
+      let baseSold = Math.round(share * toy.baseDemand);
+      baseSold = Math.min(baseSold, teamOrder);
+
+      // Step 2: fit multiplier applied AFTER base rounding
+      const fitMultiplier =
+        FIT_MATRIX[toy.id]?.[team.id] || 1;
+
+      let actualSold = Math.round(baseSold * fitMultiplier);
+      actualSold = Math.min(actualSold, teamOrder);
+
+      results[team.id].sold[toy.id] = actualSold;
+
+      if (team.id === "imagination" && currentQuarter === "2") {
+  console.log(toy.id, {
+    share,
+    baseDemand: toy.baseDemand,
+    baseSold,
+    fitMultiplier,
+    actualSold
+  });
+}
+      // ---- REVENUE CALCULATION ----
+
+      // Per-toy rounding (Excel-style display rounding)
+      const baseRevenue = round2(
+        actualSold * toy.sellingPrice
+      );
+
+
+      const buildingMultiplier =
+        Number(
+          localStorage.getItem(
+            `${team.id}-Q${currentQuarter}-buildingMultiplier`
+          )
+        ) || 1;
+
+      const buildingRevenue = round2(
+        baseRevenue * buildingMultiplier
+      );
+
+      const laborMultiplier =
+        Number(
+          localStorage.getItem(
+            `${team.id}-Q${currentQuarter}-laborMultiplier`
+          )
+        ) || 1;
+
+      const finalRevenue = round2(
+        buildingRevenue * laborMultiplier
+      );
+
+      results[team.id].baseRevenue += baseRevenue;
+      results[team.id].buildingRevenue += buildingRevenue;
+      results[team.id].finalRevenue += finalRevenue;
+    });
+  });
+
+  // Final rounding of totals
+  teams.forEach((team) => {
+    results[team.id].baseRevenue = round2(
+      results[team.id].baseRevenue
+    );
+
+    results[team.id].buildingRevenue = round2(
+      results[team.id].buildingRevenue
+    );
+
+    results[team.id].finalRevenue = round2(
+      results[team.id].finalRevenue
+    );
+  });
+
+  return results;
+}
