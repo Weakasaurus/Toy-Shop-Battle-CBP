@@ -244,3 +244,37 @@ export default function AdminPanel() {
     </div>
   );
 }
+
+const styles = {
+  wrapper: {
+    minHeight: "100vh",
+    background:
+      "linear-gradient(180deg, #d385ec 0%, #a3e7f0 100%)"
+  },
+  container: {
+    maxWidth: "1300px",
+    margin: "0 auto",
+    padding: "40px"
+  },
+  title: {
+    fontSize: "50px",
+    marginBottom: "20px"
+  },
+  card: {
+    backgroundColor: "white",
+    padding: "30px",
+    borderRadius: "15px",
+    marginBottom: "40px",
+    overflowX: "auto"
+  },
+  table: {
+    width: "100%",
+    borderCollapse: "collapse",
+    marginTop: "15px"
+  },
+  cell: {
+    border: "1px solid black",
+    padding: "6px",
+    textAlign: "center"
+  }
+};
