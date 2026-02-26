@@ -64,7 +64,33 @@ export default function AdminPanel() {
       }
     }
   };
+const resetSimulation = async () => {
+  const confirmReset = window.confirm(
+    "Are you sure you want to reset the entire simulation?"
+  );
+  if (!confirmReset) return;
 
+  // Reset game state
+  await updateDoc(doc(db, "gameState", "main"), {
+    currentQuarter: 1,
+    viewingQuarter: 1,
+    Q1Released: false,
+    Q2Released: false,
+    Q3Released: false,
+    Q4Released: false
+  });
+
+  // Clear quarters data
+  for (let q = 1; q <= 4; q++) {
+    await updateDoc(doc(db, "quarters", `Q${q}`), {
+      stores: {},
+      calculated: false
+    });
+  }
+
+  alert("Simulation reset.");
+  loadData();
+};
   useEffect(() => {
     loadData();
   }, []);
@@ -134,7 +160,9 @@ export default function AdminPanel() {
     <div style={styles.wrapper}>
       <div style={styles.container}>
         <h1 style={styles.title}>Admin Dashboard</h1>
-
+<button onClick={resetSimulation}>
+  🔄 Reset Simulation
+</button>
         {Object.entries(QUARTERS).map(([quarter, toys]) => {
           const data = quarterData[quarter] || {};
           const stores = data?.stores || {};

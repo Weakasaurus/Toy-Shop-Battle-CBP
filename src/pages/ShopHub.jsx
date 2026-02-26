@@ -101,29 +101,43 @@ export default function ShopHub() {
   }, [shopId, navigate]);
 
   // 🔒 Firebase submission lock
-  useEffect(() => {
-    const checkLock = async () => {
-      const snap = await getDoc(
-        doc(db, "quarters", `Q${currentQuarter}`)
-      );
+ useEffect(() => {
+  const checkLock = async () => {
+    const gameSnap = await getDoc(
+      doc(db, "gameState", "main")
+    );
 
-      if (snap.exists()) {
-        const data = snap.data();
-        const storeData = data?.stores?.[shopId];
+    if (!gameSnap.exists()) return;
 
-        if (
-          storeData?.submitted &&
-          !released[currentQuarter]
-        ) {
-          navigate(`/waiting/${shopId}`, {
-            replace: true
-          });
-        }
-      }
-    };
+    const gameData = gameSnap.data();
+    const currentQuarter = gameData.currentQuarter;
 
-    checkLock();
-  }, [shopId, currentQuarter, released, navigate]);
+    const quarterSnap = await getDoc(
+      doc(db, "quarters", `Q${currentQuarter}`)
+    );
+
+    if (!quarterSnap.exists()) return;
+
+    const quarterData = quarterSnap.data();
+    const storeData =
+      quarterData?.stores?.[shopId];
+
+    const submitted =
+      storeData?.submitted === true;
+
+    const released =
+      gameData?.[`Q${currentQuarter}Released`] === true;
+
+    // LOCK ONLY CURRENT QUARTER
+    if (submitted && !released) {
+      navigate(`/waiting/${shopId}`, {
+        replace: true
+      });
+    }
+  };
+
+  checkLock();
+}, [shopId, navigate]);
 
   if (!shop) return <div>Shop Not Found</div>;
 

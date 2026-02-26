@@ -41,36 +41,45 @@ export default function StrategyPage() {
   }, [shopId, navigate]);
 
   /* 🔄 LOAD GAME STATE + LOCK CHECK */
-  useEffect(() => {
-    const loadState = async () => {
-      const gameSnap = await getDoc(
-        doc(db, "gameState", "main")
-      );
+useEffect(() => {
+  const checkLock = async () => {
+    const gameSnap = await getDoc(
+      doc(db, "gameState", "main")
+    );
 
-      if (gameSnap.exists()) {
-        const gameData = gameSnap.data();
-        setCurrentQuarter(gameData.currentQuarter || 1);
-      }
+    if (!gameSnap.exists()) return;
 
-      const quarterSnap = await getDoc(
-        doc(db, "quarters", `Q${currentQuarter}`)
-      );
+    const gameData = gameSnap.data();
+    const activeQuarter = gameData.currentQuarter;
 
-      if (quarterSnap.exists()) {
-        const data = quarterSnap.data();
-        const storeData = data?.stores?.[shopId];
+    setCurrentQuarter(activeQuarter);
 
-        const submitted = storeData?.submitted === true;
-        const released = gameSnap?.data()?.[`Q${currentQuarter}Released`];
+    const quarterSnap = await getDoc(
+      doc(db, "quarters", `Q${activeQuarter}`)
+    );
 
-        if (submitted && !released) {
-          navigate(`/waiting/${shopId}`, { replace: true });
-        }
-      }
-    };
+    if (!quarterSnap.exists()) return;
 
-    loadState();
-  }, [shopId, navigate, currentQuarter]);
+    const quarterData = quarterSnap.data();
+    const storeData =
+      quarterData?.stores?.[shopId];
+
+    const submitted =
+      storeData?.submitted === true;
+
+    const released =
+      gameData?.[`Q${activeQuarter}Released`] === true;
+
+    // LOCK ONLY CURRENT QUARTER
+    if (submitted && !released) {
+      navigate(`/waiting/${shopId}`, {
+        replace: true
+      });
+    }
+  };
+
+  checkLock();
+}, [shopId, navigate]);
 
   const total =
     (rent?.cost || 0) +
