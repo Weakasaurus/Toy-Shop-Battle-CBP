@@ -124,12 +124,24 @@ const released =
           Results will appear once the coach releases them.
         </p>
 
-        <button
-          style={styles.button}
-          onClick={() => navigate("/")}
-        >
-          Back to Home
-        </button>
+<div style={{ display: "flex", gap: "20px", justifyContent: "center" }}>
+  <button
+    style={styles.button}
+    onClick={() => navigate(`/hub/${shopId}`)}
+  >
+    Back to Hub
+  </button>
+
+  <button
+    style={{
+      ...styles.button,
+      backgroundColor: "#ddd"
+    }}
+    onClick={() => navigate("/")}
+  >
+    Back to Home
+  </button>
+</div>
       </div>
     </div>
   );
