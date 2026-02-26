@@ -108,10 +108,13 @@ useEffect(() => {
     await setDoc(quarterRef, {}, { merge: true });
 
     await updateDoc(quarterRef, {
-      [`stores.${shopId}.businessExpenses`]: total,
-      [`stores.${shopId}.buildingMultiplier`]: rent.multiplier,
-      [`stores.${shopId}.laborMultiplier`]: labor.multiplier
-    });
+  [`stores.${shopId}.businessExpenses`]: total,
+  [`stores.${shopId}.insuranceCost`]: insurance.cost,
+  [`stores.${shopId}.rentCost`]: rent.cost,
+  [`stores.${shopId}.laborCost`]: labor.cost,
+  [`stores.${shopId}.buildingMultiplier`]: rent.multiplier,
+  [`stores.${shopId}.laborMultiplier`]: labor.multiplier
+});
 
     navigate(`/purchase/${shopId}`);
   };

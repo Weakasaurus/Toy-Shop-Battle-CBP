@@ -187,16 +187,18 @@ const resetSimulation = async () => {
                 <thead>
                   <tr>
                     <th style={styles.cell}>Shop</th>
-                    <th style={styles.cell}>Base Revenue</th>
-                    <th style={styles.cell}>Building Revenue</th>
-                    <th style={styles.cell}>Final Revenue</th>
-                    <th style={styles.cell}>Total Expenses</th>
-                    <th style={styles.cell}>Profit</th>
+<th style={styles.cell}>Insurance</th>
+<th style={styles.cell}>Base Revenue</th>
+<th style={styles.cell}>Building Revenue</th>
+<th style={styles.cell}>Final Revenue</th>
+<th style={styles.cell}>Total Expenses</th>
+<th style={styles.cell}>Profit</th>
                   </tr>
                 </thead>
                 <tbody>
                   {ALL_SHOPS.map((shop) => {
                     const s = stores[shop] || {};
+                    const insurance = s.insuranceCost || 0;
                     const base = s.baseRevenue || 0;
                     const building = s.buildingRevenue || 0;
                     const final = s.finalRevenue || 0;
@@ -204,14 +206,15 @@ const resetSimulation = async () => {
 
                     return (
                       <tr key={shop}>
-                        <td style={styles.cell}>{shop}</td>
-                        <td style={styles.cell}>{formatMoney(base)}</td>
-                        <td style={styles.cell}>{formatMoney(building)}</td>
-                        <td style={styles.cell}>{formatMoney(final)}</td>
-                        <td style={styles.cell}>{formatMoney(expenses)}</td>
-                        <td style={styles.cell}>
-                          {formatMoney(final - expenses)}
-                        </td>
+                        <tr key={shop}>
+  <td style={styles.cell}>{shop}</td>
+  <td style={styles.cell}>{formatMoney(insurance)}</td>
+  <td style={styles.cell}>{formatMoney(base)}</td>
+  <td style={styles.cell}>{formatMoney(building)}</td>
+  <td style={styles.cell}>{formatMoney(final)}</td>
+  <td style={styles.cell}>{formatMoney(expenses)}</td>
+  <td style={styles.cell}>{formatMoney(final - expenses)}</td>
+</tr>
                       </tr>
                     );
                   })}
