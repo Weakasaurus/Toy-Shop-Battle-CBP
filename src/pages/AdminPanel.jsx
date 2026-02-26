@@ -38,9 +38,7 @@ export default function AdminPanel() {
 
   useEffect(() => {
     const saved = sessionStorage.getItem("adminAuthorized");
-    if (saved === "true") {
-      setAuthorized(true);
-    }
+    if (saved === "true") setAuthorized(true);
   }, []);
 
   const handleLogin = () => {
@@ -52,24 +50,23 @@ export default function AdminPanel() {
     }
   };
 
-  const loadGameState = async () => {
-    const snap = await getDoc(doc(db, "gameState", "main"));
-    if (snap.exists()) setGameState(snap.data());
-  };
+  const loadData = async () => {
+    const gameSnap = await getDoc(doc(db, "gameState", "main"));
+    if (gameSnap.exists()) setGameState(gameSnap.data());
 
-  const loadQuarter = async (q) => {
-    const snap = await getDoc(doc(db, "quarters", `Q${q}`));
-    if (snap.exists()) {
-      setQuarterData((prev) => ({
-        ...prev,
-        [q]: snap.data()
-      }));
+    for (let q = 1; q <= 4; q++) {
+      const snap = await getDoc(doc(db, "quarters", `Q${q}`));
+      if (snap.exists()) {
+        setQuarterData((prev) => ({
+          ...prev,
+          [q]: snap.data()
+        }));
+      }
     }
   };
 
   useEffect(() => {
-    loadGameState();
-    [1, 2, 3, 4].forEach((q) => loadQuarter(q));
+    loadData();
   }, []);
 
   const releaseQuarter = async (q) => {
@@ -80,7 +77,7 @@ export default function AdminPanel() {
     });
 
     alert(`Quarter ${q} released.`);
-    loadGameState();
+    loadData();
   };
 
   const recalculateMarket = async (q) => {
@@ -114,7 +111,7 @@ export default function AdminPanel() {
       calculated: true
     });
 
-    loadQuarter(q);
+    loadData();
   };
 
   if (!authorized) {
@@ -141,7 +138,6 @@ export default function AdminPanel() {
         {Object.entries(QUARTERS).map(([quarter, toys]) => {
           const data = quarterData[quarter] || {};
           const stores = data?.stores || {};
-          const isReleased = gameState?.[`Q${quarter}Released`];
 
           return (
             <div key={quarter} style={styles.card}>
@@ -163,23 +159,31 @@ export default function AdminPanel() {
                 <thead>
                   <tr>
                     <th style={styles.cell}>Shop</th>
+                    <th style={styles.cell}>Base Revenue</th>
+                    <th style={styles.cell}>Building Revenue</th>
                     <th style={styles.cell}>Final Revenue</th>
-                    <th style={styles.cell}>Expenses</th>
+                    <th style={styles.cell}>Total Expenses</th>
                     <th style={styles.cell}>Profit</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {ALL_SHOPS.map((store) => {
-                    const s = stores[store] || {};
+                  {ALL_SHOPS.map((shop) => {
+                    const s = stores[shop] || {};
+                    const base = s.baseRevenue || 0;
+                    const building = s.buildingRevenue || 0;
                     const final = s.finalRevenue || 0;
                     const expenses = s.expenses || 0;
 
                     return (
-                      <tr key={store}>
-                        <td style={styles.cell}>{store}</td>
+                      <tr key={shop}>
+                        <td style={styles.cell}>{shop}</td>
+                        <td style={styles.cell}>{formatMoney(base)}</td>
+                        <td style={styles.cell}>{formatMoney(building)}</td>
                         <td style={styles.cell}>{formatMoney(final)}</td>
                         <td style={styles.cell}>{formatMoney(expenses)}</td>
-                        <td style={styles.cell}>{formatMoney(final - expenses)}</td>
+                        <td style={styles.cell}>
+                          {formatMoney(final - expenses)}
+                        </td>
                       </tr>
                     );
                   })}
@@ -192,6 +196,8 @@ export default function AdminPanel() {
               <table style={styles.table}>
                 <thead>
                   <tr>
+                    <th style={styles.cell}>Base Demand</th>
+                    <th style={styles.cell}>Total Supply</th>
                     <th style={styles.cell}>Toy</th>
                     {ALL_SHOPS.map((shop) => (
                       <th key={shop} style={styles.cell}>{shop}</th>
@@ -201,7 +207,16 @@ export default function AdminPanel() {
                 <tbody>
                   {toys.map((toy) => (
                     <tr key={toy.id}>
-                      <td style={styles.cell}>{toy.name}</td>
+                      <td style={styles.cell}>{toy.baseDemand}</td>
+                      <td style={styles.cell}>
+                        {ALL_SHOPS.reduce(
+                          (sum, shop) =>
+                            sum + (stores?.[shop]?.orders?.[toy.id] || 0),
+                          0
+                        )}
+                      </td>
+                                            <td style={styles.cell}>{toy.name}</td>
+
                       {ALL_SHOPS.map((shop) => (
                         <td key={shop} style={styles.cell}>
                           {stores?.[shop]?.sold?.[toy.id] || 0}

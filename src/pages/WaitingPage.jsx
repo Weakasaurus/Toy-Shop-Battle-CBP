@@ -55,11 +55,7 @@ export default function WaitingPage() {
   /* 🧠 Check Submissions + Run Market */
   useEffect(() => {
     const checkAndRunMarket = async () => {
-      const quarterRef = doc(
-        db,
-        "quarters",
-        `Q${currentQuarter}`
-      );
+      const quarterRef = doc(db, "quarters", `Q${gameState.currentQuarter}`);
 
       const snap = await getDoc(quarterRef);
       if (!snap.exists()) return;
@@ -103,9 +99,10 @@ export default function WaitingPage() {
         });
       }
 
-      const released =
-        gameState?.[`Q${currentQuarter}Released`];
-
+const released =
+  gameState?.[`Q${currentQuarter - 1}Released`] ||
+  gameState?.[`Q${currentQuarter}Released`];
+  
       if (released) {
         navigate(`/results/${shopId}`, {
           replace: true
