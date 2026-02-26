@@ -1,228 +1,160 @@
-import { useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
-import { db } from "../firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { useParams, useNavigate } from "react-router-dom";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+  Legend
+} from "recharts";
 
-const STORES = [
-  {
-    id: "imagination",
-    name: "Imagination Station",
-    students: ["Coach Store"]
-  },
-  {
-    id: "toytopia",
-    name: "Toytopia",
-    students: ["Sebastian", "Amara", "Brooke", "Lizzie", "Pedro"]
-  },
-  {
-    id: "giggles",
-    name: "Giggles and Gizmos",
-    students: ["Levi", "Zoe", "Tiernan", "Tyler", "Nico"]
-  },
-  {
-    id: "tinkertown",
-    name: "Tinkertown Toys",
-    students: ["Zenovia", "Miera", "Silas", "Teddy"]
-  },
-  {
-    id: "playmotion",
-    name: "PlayMotion",
-    students: ["Maggie", "Aria", "Vincent", "Evan", "Jace"]
-  },
-  {
-    id: "cranium",
-    name: "Cranium Emporium",
-    students: ["Django", "Keane", "Evangeline", "Tigo"]
-  }
-];
+const safeNumber = (v) => {
+  const n = Number(v);
+  return isNaN(n) ? 0 : n;
+};
 
-export default function LandingPage() {
+const roundMoney = (value) =>
+  Number((Math.round(value * 100) / 100).toFixed(2));
+
+const formatMoney = (value) =>
+  `$${roundMoney(value).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })}`;
+
+const quarterMap = {
+  1: "Quarter One ❄️",
+  2: "Quarter Two 🌷",
+  3: "Quarter Three ☀️",
+  4: "Quarter Four 🎁"
+};
+
+export default function FinalSummary() {
+  const { shopId } = useParams();
   const navigate = useNavigate();
-  const [quarterData, setQuarterData] = useState({});
 
-  const currentQuarter =
-    localStorage.getItem("currentQuarter") || "1";
+  const allData = [1, 2, 3, 4].map(q => {
+    const revenueRaw = safeNumber(
+      localStorage.getItem(`${shopId}-Q${q}-finalRevenue`)
+    );
 
-  const quarterMap = {
-    "1": "Quarter One ❄️",
-    "2": "Quarter Two 🌷",
-    "3": "Quarter Three ☀️",
-    "4": "Quarter Four 🍁"
-  };
+    const expensesRaw = safeNumber(
+      localStorage.getItem(`${shopId}-Q${q}-expenses`)
+    );
 
-  useEffect(() => {
-    const loadData = async () => {
-      let allData = {};
+    const revenue = roundMoney(revenueRaw);
+    const profit = roundMoney(revenueRaw - expensesRaw);
 
-      for (let q = 1; q <= 4; q++) {
-        const snap = await getDoc(
-          doc(db, "quarters", `Q${q}`)
-        );
-
-        if (snap.exists()) {
-          allData[q] = snap.data();
-        }
-      }
-
-      setQuarterData(allData);
+    return {
+      quarter: quarterMap[q],
+      Revenue: revenue,
+      Profit: profit
     };
+  });
 
-    loadData();
-  }, []);
+  const totalRevenue = roundMoney(
+    allData.reduce((sum, q) => sum + q.Revenue, 0)
+  );
 
-  const getProfit = (storeId, quarter) => {
-    const released =
-      localStorage.getItem(`Q${quarter}-released`) === "true";
-
-    if (!released) return "";
-
-    const stores =
-      quarterData?.[quarter]?.stores || {};
-
-    const final =
-      stores?.[storeId]?.finalRevenue || 0;
-
-    const expenses =
-      stores?.[storeId]?.expenses || 0;
-
-    const profit = final - expenses;
-
-    return `$${profit.toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    })}`;
-  };
-
-  const getTotalProfit = (storeId) => {
-    let total = 0;
-
-    for (let q = 1; q <= 4; q++) {
-      const released =
-        localStorage.getItem(`Q${q}-released`) === "true";
-
-      if (!released) continue;
-
-      const stores =
-        quarterData?.[q]?.stores || {};
-
-      const final =
-        stores?.[storeId]?.finalRevenue || 0;
-
-      const expenses =
-        stores?.[storeId]?.expenses || 0;
-
-      total += final - expenses;
-    }
-
-    return total;
-  };
-
-  const isGameComplete =
-    localStorage.getItem("Q4-released") === "true";
-
-  let winnerName = "";
-  let highestProfit = -Infinity;
-
-  if (isGameComplete) {
-    STORES.forEach((store) => {
-      const total =
-        getTotalProfit(store.id);
-
-      if (total > highestProfit) {
-        highestProfit = total;
-        winnerName = store.name;
-      }
-    });
-  }
-
-  const topRow = STORES.slice(0, 3);
-  const bottomRow = STORES.slice(3, 6);
-
-  const renderRow = (stores) => (
-    <div style={styles.row}>
-      {stores.map((store) => (
-        <div key={store.id} style={styles.storeCard}>
-          <div
-            style={styles.imageWrapper}
-            onClick={() =>
-              navigate(`/hub/${store.id}`)
-            }
-          >
-            <img
-              src={`/images/${store.id}.png`}
-              alt={store.name}
-              style={styles.storeImage}
-            />
-          </div>
-
-          <div style={styles.storeName}>
-            {store.name}
-          </div>
-
-          <div style={styles.studentList}>
-            {store.students.map((name) => (
-              <div key={name}>{name}</div>
-            ))}
-          </div>
-
-          {[1, 2, 3, 4].map((q) => (
-            <div key={q} style={styles.profitRow}>
-              <strong>Profit Q{q}:</strong>{" "}
-              {getProfit(store.id, q)}
-            </div>
-          ))}
-
-          <div style={styles.totalProfitRow}>
-            <strong>Total Profit:</strong>{" "}
-            ${getTotalProfit(
-              store.id
-            ).toLocaleString(undefined, {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2
-            })}
-          </div>
-        </div>
-      ))}
-    </div>
+  const totalProfit = roundMoney(
+    allData.reduce((sum, q) => sum + q.Profit, 0)
   );
 
   return (
     <div style={styles.pageWrapper}>
       <div style={styles.container}>
-        <h1 style={styles.banner}>
-          Toy Shop Battle
+        <h1 style={styles.title}>
+          🎉 Final Year Summary 🎉
         </h1>
 
-        <div style={styles.tracker}>
-          {isGameComplete ? (
-            <>
-              🎉 <strong>All Done!</strong>
-              <br />
-              🏆 Overall Winner:{" "}
-              <strong>{winnerName}</strong>
-            </>
-          ) : (
-            <>
-              Currently in:{" "}
-              <strong>
-                {quarterMap[currentQuarter]}
-              </strong>
-            </>
-          )}
+        {/* Quarter Breakdown */}
+        <div style={styles.card}>
+          <h2 style={styles.sectionTitle}>
+            Year Breakdown
+          </h2>
+
+          {allData.map((q, index) => (
+            <div key={index} style={styles.row}>
+              <span>{q.quarter}</span>
+              <span>{formatMoney(q.Revenue)}</span>
+              <span
+                style={{
+                  color: q.Profit >= 0 ? "green" : "red"
+                }}
+              >
+                {formatMoney(q.Profit)}
+              </span>
+            </div>
+          ))}
         </div>
 
-        {renderRow(topRow)}
-        {renderRow(bottomRow)}
-      </div>
+        {/* Graph */}
+        <div style={styles.card}>
+          <h2 style={styles.sectionTitle}>
+            Revenue & Profit Over Time 📈
+          </h2>
 
-      <div style={styles.teacherLinkWrapper}>
+          <ResponsiveContainer width="100%" height={350}>
+            <LineChart data={allData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="quarter" />
+              <YAxis
+                tickFormatter={(value) =>
+                  `$${value.toLocaleString()}`
+                }
+              />
+              <Tooltip formatter={(value) => formatMoney(value)} />
+              <Legend />
+
+              <Line
+                type="monotone"
+                dataKey="Revenue"
+                stroke="#ffcc66"
+                strokeWidth={3}
+                dot={{ r: 6 }}
+              />
+
+              <Line
+                type="monotone"
+                dataKey="Profit"
+                stroke="green"
+                strokeWidth={3}
+                dot={{ r: 6 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Totals */}
+        <div style={styles.card}>
+          <h2 style={styles.sectionTitle}>
+            Year Totals
+          </h2>
+
+          <div style={styles.row}>
+            <span>Total Revenue</span>
+            <strong>{formatMoney(totalRevenue)}</strong>
+          </div>
+
+          <div style={styles.row}>
+            <span>Total Profit</span>
+            <strong
+              style={{
+                color: totalProfit >= 0 ? "green" : "red"
+              }}
+            >
+              {formatMoney(totalProfit)}
+            </strong>
+          </div>
+        </div>
+
         <button
-          style={styles.teacherLink}
-          onClick={() =>
-            navigate("/admin")
-          }
+          style={styles.button}
+          onClick={() => navigate("/")}
         >
-          Chloe Only
+          Back to Home
         </button>
       </div>
     </div>
@@ -233,78 +165,43 @@ const styles = {
   pageWrapper: {
     minHeight: "100vh",
     background:
-      "linear-gradient(180deg, #d385ec 0%, #a3e7f0 100%)"
+      "linear-gradient(180deg, #fdf7ff 0%, #e0f7fa 100%)"
   },
   container: {
-    maxWidth: "1200px",
+    maxWidth: "1000px",
     margin: "0 auto",
     padding: "60px 20px",
     textAlign: "center"
   },
-  banner: {
+  title: {
     fontFamily: "Funkids",
-    fontSize: "180px",
-    marginBottom: "30px"
-  },
-  tracker: {
-    fontSize: "26px",
-    backgroundColor: "#fff8e1",
-    padding: "20px",
-    borderRadius: "25px",
+    fontSize: "70px",
     marginBottom: "40px"
+  },
+  card: {
+    backgroundColor: "white",
+    padding: "35px",
+    borderRadius: "30px",
+    marginBottom: "35px",
+    boxShadow: "0 8px 20px rgba(0,0,0,0.1)"
+  },
+  sectionTitle: {
+    fontSize: "28px",
+    marginBottom: "20px"
   },
   row: {
     display: "flex",
-    justifyContent: "center",
-    gap: "30px",
-    marginBottom: "50px"
-  },
-  storeCard: {
-    backgroundColor: "white",
-    padding: "30px",
-    borderRadius: "30px",
-    width: "320px",
-    boxShadow: "0 8px 20px rgba(0,0,0,0.1)"
-  },
-  imageWrapper: {
-    cursor: "pointer"
-  },
-  storeImage: {
-    width: "260px",
-    borderRadius: "20px",
-    marginBottom: "15px"
-  },
-  storeName: {
-    fontWeight: "bold",
-    fontFamily: "Funkids",
-    fontSize: "40px",
-    marginBottom: "15px"
-  },
-  studentList: {
-    fontSize: "25px",
-    marginBottom: "15px"
-  },
-  profitRow: {
+    justifyContent: "space-between",
     fontSize: "22px",
-    marginBottom: "6px"
+    marginBottom: "12px"
   },
-  totalProfitRow: {
-    fontSize: "24px",
-    marginTop: "12px",
-    fontWeight: "bold",
-    borderTop: "2px solid #ddd",
-    paddingTop: "10px"
-  },
-  teacherLinkWrapper: {
-    marginTop: "60px",
-    textAlign: "right"
-  },
-  teacherLink: {
-    background: "none",
+  button: {
+    padding: "18px 50px",
+    fontSize: "22px",
+    borderRadius: "40px",
     border: "none",
-    color: "#888",
-    fontSize: "16px",
-    cursor: "pointer",
-    fontFamily: "Funkids"
+    backgroundColor: "#ffcc66",
+    fontFamily: "Funkids",
+    cursor: "pointer"
   }
 };
