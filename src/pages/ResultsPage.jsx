@@ -49,35 +49,43 @@ export default function ResultsPage() {
   }, [shopId, navigate]);
 
   /* 🔄 Load game state + quarter data */
-  useEffect(() => {
-    const loadData = async () => {
-      const gameSnap = await getDoc(
-        doc(db, "gameState", "main")
+ useEffect(() => {
+  const loadData = async () => {
+    const gameSnap = await getDoc(
+      doc(db, "gameState", "main")
+    );
+
+    if (gameSnap.exists()) {
+      const data = gameSnap.data();
+      setGameState(data);
+
+      const releasedQuarters = [1, 2, 3, 4].filter(
+        (q) => data[`Q${q}Released`]
       );
 
-      if (gameSnap.exists()) {
-        const data = gameSnap.data();
-        setGameState(data);
-        setViewingQuarter(
-          data.viewingQuarter || data.currentQuarter || 1
-        );
+      const latestReleased =
+        releasedQuarters.length > 0
+          ? Math.max(...releasedQuarters)
+          : 1;
+
+      setViewingQuarter(latestReleased);
+    }
+
+    let allData = {};
+    for (let q = 1; q <= 4; q++) {
+      const snap = await getDoc(
+        doc(db, "quarters", `Q${q}`)
+      );
+      if (snap.exists()) {
+        allData[q] = snap.data();
       }
+    }
 
-      let allData = {};
-      for (let q = 1; q <= 4; q++) {
-        const snap = await getDoc(
-          doc(db, "quarters", `Q${q}`)
-        );
-        if (snap.exists()) {
-          allData[q] = snap.data();
-        }
-      }
+    setQuarterData(allData);
+  };
 
-      setQuarterData(allData);
-    };
-
-    loadData();
-  }, []);
+  loadData();
+}, []);
 
   const releasedQuarters = [1, 2, 3, 4].filter(
     (q) => gameState?.[`Q${q}Released`]

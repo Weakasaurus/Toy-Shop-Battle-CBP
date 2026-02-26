@@ -274,7 +274,9 @@ const styles = {
     background: "#d385ec"
   },
   secondary: {
-    padding: "16px",
+    padding: "18px",
+        fontSize: "24px",
+
     fontFamily: "Funkids",
     borderRadius: "20px"
   },
