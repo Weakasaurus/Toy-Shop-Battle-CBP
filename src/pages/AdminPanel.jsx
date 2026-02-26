@@ -64,45 +64,65 @@ export default function AdminPanel() {
       }
     }
   };
-const resetSimulation = async () => {
-  const confirmReset = window.confirm(
-    "Are you sure you want to reset the entire simulation?"
-  );
-  if (!confirmReset) return;
 
-  // Reset game state
-  await updateDoc(doc(db, "gameState", "main"), {
-    currentQuarter: 1,
-    viewingQuarter: 1,
-    Q1Released: false,
-    Q2Released: false,
-    Q3Released: false,
-    Q4Released: false
-  });
-
-  // Clear quarters data
-  for (let q = 1; q <= 4; q++) {
-    await updateDoc(doc(db, "quarters", `Q${q}`), {
-      stores: {},
-      calculated: false
-    });
-  }
-
-  alert("Simulation reset.");
-  loadData();
-};
   useEffect(() => {
     loadData();
   }, []);
 
-  const releaseQuarter = async (q) => {
+  const resetSimulation = async () => {
+    if (!window.confirm("Reset entire simulation?")) return;
+
     await updateDoc(doc(db, "gameState", "main"), {
-      [`Q${q}Released`]: true,
-      currentQuarter: q < 4 ? q + 1 : 4,
-      viewingQuarter: q < 4 ? q + 1 : 4
+      currentQuarter: 1,
+      viewingQuarter: 1,
+      Q1StrategyOpen: true,
+      Q1PurchaseOpen: false,
+      Q1ResultsReleased: false,
+      Q2StrategyOpen: false,
+      Q2PurchaseOpen: false,
+      Q2ResultsReleased: false,
+      Q3StrategyOpen: false,
+      Q3PurchaseOpen: false,
+      Q3ResultsReleased: false,
+      Q4StrategyOpen: false,
+      Q4PurchaseOpen: false,
+      Q4ResultsReleased: false
     });
 
-    alert(`Quarter ${q} released.`);
+    for (let q = 1; q <= 4; q++) {
+      await updateDoc(doc(db, "quarters", `Q${q}`), {
+        stores: {},
+        calculated: false
+      });
+    }
+
+    alert("Simulation reset.");
+    loadData();
+  };
+
+  const openStrategy = async (q) => {
+    await updateDoc(doc(db, "gameState", "main"), {
+      [`Q${q}StrategyOpen`]: true,
+      [`Q${q}PurchaseOpen`]: false,
+      [`Q${q}ResultsReleased`]: false
+    });
+    loadData();
+  };
+
+  const openPurchase = async (q) => {
+    await updateDoc(doc(db, "gameState", "main"), {
+      [`Q${q}StrategyOpen`]: false,
+      [`Q${q}PurchaseOpen`]: true
+    });
+    loadData();
+  };
+
+  const releaseResults = async (q) => {
+    await updateDoc(doc(db, "gameState", "main"), {
+      [`Q${q}ResultsReleased`]: true,
+      currentQuarter: q < 4 ? q + 1 : 4,
+      viewingQuarter: q
+    });
     loadData();
   };
 
@@ -160,9 +180,11 @@ const resetSimulation = async () => {
     <div style={styles.wrapper}>
       <div style={styles.container}>
         <h1 style={styles.title}>Admin Dashboard</h1>
-<button onClick={resetSimulation}>
-  🔄 Reset Simulation
-</button>
+
+        <button onClick={resetSimulation}>
+          🔄 Reset Simulation
+        </button>
+
         {Object.entries(QUARTERS).map(([quarter, toys]) => {
           const data = quarterData[quarter] || {};
           const stores = data?.stores || {};
@@ -171,28 +193,44 @@ const resetSimulation = async () => {
             <div key={quarter} style={styles.card}>
               <h2>Quarter {quarter}</h2>
 
-              <button onClick={() => releaseQuarter(Number(quarter))}>
-                Release Quarter
-              </button>
+              <div style={{ marginBottom: 10 }}>
+                <button onClick={() => openStrategy(Number(quarter))}>
+                  🟢 Open Strategy
+                </button>
 
-              <button
-                onClick={() => recalculateMarket(Number(quarter))}
-                style={{ marginLeft: 10 }}
-              >
-                Recalculate Market
-              </button>
+                <button
+                  onClick={() => openPurchase(Number(quarter))}
+                  style={{ marginLeft: 10 }}
+                >
+                  🟡 Open Purchase
+                </button>
+
+                <button
+                  onClick={() => releaseResults(Number(quarter))}
+                  style={{ marginLeft: 10 }}
+                >
+                  🔵 Release Results
+                </button>
+
+                <button
+                  onClick={() => recalculateMarket(Number(quarter))}
+                  style={{ marginLeft: 10 }}
+                >
+                  Recalculate Market
+                </button>
+              </div>
 
               {/* Financial Summary */}
               <table style={styles.table}>
                 <thead>
                   <tr>
                     <th style={styles.cell}>Shop</th>
-<th style={styles.cell}>Insurance</th>
-<th style={styles.cell}>Base Revenue</th>
-<th style={styles.cell}>Building Revenue</th>
-<th style={styles.cell}>Final Revenue</th>
-<th style={styles.cell}>Total Expenses</th>
-<th style={styles.cell}>Profit</th>
+                    <th style={styles.cell}>Insurance</th>
+                    <th style={styles.cell}>Base Revenue</th>
+                    <th style={styles.cell}>Building Revenue</th>
+                    <th style={styles.cell}>Final Revenue</th>
+                    <th style={styles.cell}>Total Expenses</th>
+                    <th style={styles.cell}>Profit</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -206,15 +244,13 @@ const resetSimulation = async () => {
 
                     return (
                       <tr key={shop}>
-                        <tr key={shop}>
-  <td style={styles.cell}>{shop}</td>
-  <td style={styles.cell}>{formatMoney(insurance)}</td>
-  <td style={styles.cell}>{formatMoney(base)}</td>
-  <td style={styles.cell}>{formatMoney(building)}</td>
-  <td style={styles.cell}>{formatMoney(final)}</td>
-  <td style={styles.cell}>{formatMoney(expenses)}</td>
-  <td style={styles.cell}>{formatMoney(final - expenses)}</td>
-</tr>
+                        <td style={styles.cell}>{shop}</td>
+                        <td style={styles.cell}>{formatMoney(insurance)}</td>
+                        <td style={styles.cell}>{formatMoney(base)}</td>
+                        <td style={styles.cell}>{formatMoney(building)}</td>
+                        <td style={styles.cell}>{formatMoney(final)}</td>
+                        <td style={styles.cell}>{formatMoney(expenses)}</td>
+                        <td style={styles.cell}>{formatMoney(final - expenses)}</td>
                       </tr>
                     );
                   })}
@@ -222,7 +258,9 @@ const resetSimulation = async () => {
               </table>
 
               {/* Toy Breakdown */}
-              <h3 style={{ marginTop: "30px" }}>Number of Toys Sold</h3>
+              <h3 style={{ marginTop: "30px" }}>
+                Number of Toys Sold
+              </h3>
 
               <table style={styles.table}>
                 <thead>
@@ -246,24 +284,21 @@ const resetSimulation = async () => {
                           0
                         )}
                       </td>
-                                            <td style={styles.cell}>{toy.name}</td>
+                      <td style={styles.cell}>{toy.name}</td>
 
                       {ALL_SHOPS.map((shop) => {
-  const sold =
-    stores?.[shop]?.sold?.[toy.id] || 0;
+                        const sold = stores?.[shop]?.sold?.[toy.id] || 0;
+                        const ordered = stores?.[shop]?.orders?.[toy.id] || 0;
 
-  const ordered =
-    stores?.[shop]?.orders?.[toy.id] || 0;
-
-  return (
-    <td key={shop} style={styles.cell}>
-      {sold}{" "}
-      <span style={{ color: "#777", fontSize: "14px" }}>
-        ({ordered})
-      </span>
-    </td>
-  );
-})}
+                        return (
+                          <td key={shop} style={styles.cell}>
+                            {sold}{" "}
+                            <span style={{ color: "#777", fontSize: "14px" }}>
+                              ({ordered})
+                            </span>
+                          </td>
+                        );
+                      })}
                     </tr>
                   ))}
                 </tbody>
