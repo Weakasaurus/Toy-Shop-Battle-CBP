@@ -1,190 +1,229 @@
-import { useParams, useNavigate } from "react-router-dom";
-import { useEffect } from "react";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  CartesianGrid,
-  Legend
-} from "recharts";
+import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { db } from "../firebase";
+import { doc, getDoc } from "firebase/firestore";
 
-const safeNumber = (v) => {
-  const n = Number(v);
-  return isNaN(n) ? 0 : n;
-};
+const STORES = [
+  {
+    id: "imagination",
+    name: "Imagination Station",
+    students: ["Coach Store"]
+  },
+  {
+    id: "toytopia",
+    name: "Toytopia",
+    students: ["Sebastian", "Amara", "Brooke", "Lizzie", "Pedro"]
+  },
+  {
+    id: "giggles",
+    name: "Giggles and Gizmos",
+    students: ["Levi", "Zoe", "Tiernan", "Tyler", "Nico"]
+  },
+  {
+    id: "tinkertown",
+    name: "Tinkertown Toys",
+    students: ["Zenovia", "Miera", "Silas", "Teddy"]
+  },
+  {
+    id: "playmotion",
+    name: "PlayMotion",
+    students: ["Maggie", "Aria", "Vincent", "Evan", "Jace"]
+  },
+  {
+    id: "cranium",
+    name: "Cranium Emporium",
+    students: ["Django", "Keane", "Evangeline", "Tigo"]
+  }
+];
 
-const roundMoney = (value) =>
-  Number((Math.round(value * 100) / 100).toFixed(2));
-
-const formatMoney = (value) =>
-  `$${roundMoney(value).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  })}`;
-
-const quarterMap = {
-  1: "Quarter One ❄️",
-  2: "Quarter Two 🌷",
-  3: "Quarter Three ☀️",
-  4: "Quarter Four 🎁"
-};
-
-export default function ResultsPage() {
-  const { shopId } = useParams();
+export default function LandingPage() {
   const navigate = useNavigate();
+  const [quarterData, setQuarterData] = useState({});
 
   const currentQuarter =
-    Number(localStorage.getItem("currentQuarter")) || 1;
+    localStorage.getItem("currentQuarter") || "1";
 
-  // 🔐 SESSION AUTH GUARD
+  const quarterMap = {
+    "1": "Quarter One ❄️",
+    "2": "Quarter Two 🌷",
+    "3": "Quarter Three ☀️",
+    "4": "Quarter Four 🍁"
+  };
+
   useEffect(() => {
-    const authenticated = sessionStorage.getItem("authenticatedShop");
-    if (authenticated !== shopId) {
-      navigate(`/login/${shopId}`);
+    const loadData = async () => {
+      let allData = {};
+
+      for (let q = 1; q <= 4; q++) {
+        const snap = await getDoc(
+          doc(db, "quarters", `Q${q}`)
+        );
+
+        if (snap.exists()) {
+          allData[q] = snap.data();
+        }
+      }
+
+      setQuarterData(allData);
+    };
+
+    loadData();
+  }, []);
+
+  const getProfit = (storeId, quarter) => {
+    const released =
+      localStorage.getItem(`Q${quarter}-released`) === "true";
+
+    if (!released) return "";
+
+    const stores =
+      quarterData?.[quarter]?.stores || {};
+
+    const final =
+      stores?.[storeId]?.finalRevenue || 0;
+
+    const expenses =
+      stores?.[storeId]?.expenses || 0;
+
+    const profit = final - expenses;
+
+    return `$${profit.toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    })}`;
+  };
+
+  const getTotalProfit = (storeId) => {
+    let total = 0;
+
+    for (let q = 1; q <= 4; q++) {
+      const released =
+        localStorage.getItem(`Q${q}-released`) === "true";
+
+      if (!released) continue;
+
+      const stores =
+        quarterData?.[q]?.stores || {};
+
+      const final =
+        stores?.[storeId]?.finalRevenue || 0;
+
+      const expenses =
+        stores?.[storeId]?.expenses || 0;
+
+      total += final - expenses;
     }
-  }, [shopId, navigate]);
 
-  const isReleased =
-    localStorage.getItem(`Q${currentQuarter}-released`) === "true";
+    return total;
+  };
 
-  if (!isReleased) {
-    return (
-      <div style={styles.pageWrapper}>
-        <div style={styles.container}>
-          <h1 style={styles.title}>
-            Results Not Released Yet
-          </h1>
-          <button style={styles.button} onClick={() => navigate("/")}>
-            Back to Home
-          </button>
-        </div>
-      </div>
-    );
+  const isGameComplete =
+    localStorage.getItem("Q4-released") === "true";
+
+  let winnerName = "";
+  let highestProfit = -Infinity;
+
+  if (isGameComplete) {
+    STORES.forEach((store) => {
+      const total =
+        getTotalProfit(store.id);
+
+      if (total > highestProfit) {
+        highestProfit = total;
+        winnerName = store.name;
+      }
+    });
   }
 
-  const base = safeNumber(
-    localStorage.getItem(`${shopId}-Q${currentQuarter}-baseRevenue`)
+  const topRow = STORES.slice(0, 3);
+  const bottomRow = STORES.slice(3, 6);
+
+  const renderRow = (stores) => (
+    <div style={styles.row}>
+      {stores.map((store) => (
+        <div key={store.id} style={styles.storeCard}>
+          <div
+            style={styles.imageWrapper}
+            onClick={() =>
+              navigate(`/hub/${store.id}`)
+            }
+          >
+            <img
+              src={`/images/${store.id}.png`}
+              alt={store.name}
+              style={styles.storeImage}
+            />
+          </div>
+
+          <div style={styles.storeName}>
+            {store.name}
+          </div>
+
+          <div style={styles.studentList}>
+            {store.students.map((name) => (
+              <div key={name}>{name}</div>
+            ))}
+          </div>
+
+          {[1, 2, 3, 4].map((q) => (
+            <div key={q} style={styles.profitRow}>
+              <strong>Profit Q{q}:</strong>{" "}
+              {getProfit(store.id, q)}
+            </div>
+          ))}
+
+          <div style={styles.totalProfitRow}>
+            <strong>Total Profit:</strong>{" "}
+            ${getTotalProfit(
+              store.id
+            ).toLocaleString(undefined, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
   );
-
-  const building = safeNumber(
-    localStorage.getItem(`${shopId}-Q${currentQuarter}-buildingRevenue`)
-  );
-
-  const final = safeNumber(
-    localStorage.getItem(`${shopId}-Q${currentQuarter}-finalRevenue`)
-  );
-
-  const expenses = safeNumber(
-    localStorage.getItem(`${shopId}-Q${currentQuarter}-expenses`)
-  );
-
-  const profit = roundMoney(final - expenses);
-
-  const allData = [1, 2, 3, 4].map((q) => {
-    const revenueRaw = safeNumber(
-      localStorage.getItem(`${shopId}-Q${q}-finalRevenue`)
-    );
-    const expensesRaw = safeNumber(
-      localStorage.getItem(`${shopId}-Q${q}-expenses`)
-    );
-
-    return {
-      quarter: quarterMap[q],
-      Revenue: roundMoney(revenueRaw),
-      Profit: roundMoney(revenueRaw - expensesRaw)
-    };
-  });
 
   return (
     <div style={styles.pageWrapper}>
       <div style={styles.container}>
-
-        <h1 style={styles.title}>
-          {quarterMap[currentQuarter]} Results
+        <h1 style={styles.banner}>
+          Toy Shop Battle
         </h1>
 
-        <div style={styles.card}>
-          <h2 style={styles.sectionTitle}>Breakdown</h2>
-
-          <div style={styles.row}>
-            <span>Base Revenue</span>
-            <strong>{formatMoney(base)}</strong>
-          </div>
-
-          <div style={styles.row}>
-            <span>After Building</span>
-            <strong>{formatMoney(building)}</strong>
-          </div>
-
-          <div style={styles.row}>
-            <span>Final Revenue</span>
-            <strong>{formatMoney(final)}</strong>
-          </div>
-
-          <div style={styles.row}>
-            <span>Total Expenses</span>
-            <strong>{formatMoney(expenses)}</strong>
-          </div>
-
-          <div
-            style={{
-              ...styles.row,
-              fontSize: "26px",
-              fontWeight: "bold",
-              color: profit >= 0 ? "green" : "red"
-            }}
-          >
-            <span>Profit</span>
-            <strong>{formatMoney(profit)}</strong>
-          </div>
+        <div style={styles.tracker}>
+          {isGameComplete ? (
+            <>
+              🎉 <strong>All Done!</strong>
+              <br />
+              🏆 Overall Winner:{" "}
+              <strong>{winnerName}</strong>
+            </>
+          ) : (
+            <>
+              Currently in:{" "}
+              <strong>
+                {quarterMap[currentQuarter]}
+              </strong>
+            </>
+          )}
         </div>
 
-        <div style={styles.card}>
-          <h2 style={styles.sectionTitle}>
-            Revenue & Profit Over Time 📈
-          </h2>
+        {renderRow(topRow)}
+        {renderRow(bottomRow)}
+      </div>
 
-          <ResponsiveContainer width="100%" height={350}>
-            <LineChart data={allData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="quarter" />
-              <YAxis
-                tickFormatter={(value) =>
-                  `$${value.toLocaleString()}`
-                }
-              />
-              <Tooltip formatter={(value) => formatMoney(value)} />
-              <Legend />
-
-              <Line
-                type="monotone"
-                dataKey="Revenue"
-                stroke="#ffcc66"
-                strokeWidth={3}
-                dot={{ r: 6 }}
-              />
-
-              <Line
-                type="monotone"
-                dataKey="Profit"
-                stroke="green"
-                strokeWidth={3}
-                dot={{ r: 6 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-
+      <div style={styles.teacherLinkWrapper}>
         <button
-          style={styles.button}
-          onClick={() => navigate("/")}
+          style={styles.teacherLink}
+          onClick={() =>
+            navigate("/admin")
+          }
         >
-          Back to Home
+          Chloe Only
         </button>
-
       </div>
     </div>
   );
@@ -193,42 +232,79 @@ export default function ResultsPage() {
 const styles = {
   pageWrapper: {
     minHeight: "100vh",
-    background: "linear-gradient(180deg, #d385ec 0%, #a3e7f0 100%)"
+    background:
+      "linear-gradient(180deg, #d385ec 0%, #a3e7f0 100%)"
   },
   container: {
-    maxWidth: "1000px",
+    maxWidth: "1200px",
     margin: "0 auto",
     padding: "60px 20px",
     textAlign: "center"
   },
-  title: {
+  banner: {
     fontFamily: "Funkids",
-    fontSize: "60px",
+    fontSize: "180px",
+    marginBottom: "30px"
+  },
+  tracker: {
+    fontSize: "26px",
+    backgroundColor: "#fff8e1",
+    padding: "20px",
+    borderRadius: "25px",
     marginBottom: "40px"
-  },
-  card: {
-    backgroundColor: "white",
-    padding: "35px",
-    borderRadius: "30px",
-    marginBottom: "35px"
-  },
-  sectionTitle: {
-    fontSize: "28px",
-    marginBottom: "20px"
   },
   row: {
     display: "flex",
-    justifyContent: "space-between",
-    fontSize: "22px",
-    marginBottom: "12px"
+    justifyContent: "center",
+    gap: "30px",
+    marginBottom: "50px"
   },
-  button: {
-    padding: "20px 50px",
-    fontSize: "24px",
-    borderRadius: "45px",
-    border: "none",
-    backgroundColor: "#ffcc66",
-    fontFamily: "Funkids",
+  storeCard: {
+    backgroundColor: "white",
+    padding: "30px",
+    borderRadius: "30px",
+    width: "320px",
+    boxShadow: "0 8px 20px rgba(0,0,0,0.1)"
+  },
+  imageWrapper: {
     cursor: "pointer"
+  },
+  storeImage: {
+    width: "260px",
+    borderRadius: "20px",
+    marginBottom: "15px"
+  },
+  storeName: {
+    fontWeight: "bold",
+    fontFamily: "Funkids",
+    fontSize: "40px",
+    marginBottom: "15px"
+  },
+  studentList: {
+    fontSize: "25px",
+    marginBottom: "15px"
+  },
+  profitRow: {
+    fontSize: "22px",
+    marginBottom: "6px"
+  },
+  totalProfitRow: {
+    fontSize: "24px",
+    marginTop: "12px",
+    fontWeight: "bold",
+    borderTop: "2px solid #ddd",
+    paddingTop: "10px"
+  },
+  teacherLinkWrapper: {
+    marginTop: "60px",
+    textAlign: "right"
+  },
+  teacherLink: {
+    background: "none",
+    border: "none",
+    color: "#888",
+    fontSize: "16px",
+    cursor: "pointer",
+    fontFamily: "Funkids"
   }
 };
