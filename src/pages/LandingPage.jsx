@@ -4,17 +4,49 @@ import { db } from "../firebase";
 import { doc, getDoc } from "firebase/firestore";
 
 const STORES = [
-  { id: "imagination", name: "Imagination Station", students: ["Coach Store"] },
-  { id: "toytopia", name: "Toytopia", students: ["Sebastian", "Amara", "Brooke", "Lizzie", "Pedro"] },
-  { id: "giggles", name: "Giggles and Gizmos", students: ["Levi", "Zoe", "Tiernan", "Tyler", "Nico"] },
-  { id: "tinkertown", name: "Tinkertown Toys", students: ["Zenovia", "Miera", "Silas", "Teddy"] },
-  { id: "playmotion", name: "PlayMotion", students: ["Maggie", "Aria", "Vincent", "Evan", "Jace"] },
-  { id: "cranium", name: "Cranium Emporium", students: ["Django", "Keane", "Evangeline", "Tigo"] }
+  {
+    id: "imagination",
+    name: "Imagination Station",
+    students: ["Coach Store"]
+  },
+  {
+    id: "toytopia",
+    name: "Toytopia",
+    students: ["Sebastian", "Amara", "Brooke", "Lizzie", "Pedro"]
+  },
+  {
+    id: "giggles",
+    name: "Giggles and Gizmos",
+    students: ["Levi", "Zoe", "Tiernan", "Tyler", "Nico"]
+  },
+  {
+    id: "tinkertown",
+    name: "Tinkertown Toys",
+    students: ["Zenovia", "Miera", "Silas", "Teddy"]
+  },
+  {
+    id: "playmotion",
+    name: "PlayMotion",
+    students: ["Maggie", "Aria", "Vincent", "Evan", "Jace"]
+  },
+  {
+    id: "cranium",
+    name: "Cranium Emporium",
+    students: ["Django", "Keane", "Evangeline", "Tigo"]
+  }
 ];
+
+const quarterMap = {
+  1: "Quarter One ❄️",
+  2: "Quarter Two 🌷",
+  3: "Quarter Three ☀️",
+  4: "Quarter Four 🎁"
+};
 
 export default function LandingPage() {
   const navigate = useNavigate();
-  const [gameState, setGameState] = useState({});
+
+  const [gameState, setGameState] = useState(null);
   const [quarterData, setQuarterData] = useState({});
 
   useEffect(() => {
@@ -24,32 +56,41 @@ export default function LandingPage() {
         setGameState(gameSnap.data());
       }
 
-      let allQuarters = {};
+      let allData = {};
       for (let q = 1; q <= 4; q++) {
         const snap = await getDoc(doc(db, "quarters", `Q${q}`));
         if (snap.exists()) {
-          allQuarters[q] = snap.data();
+          allData[q] = snap.data();
         }
       }
-      setQuarterData(allQuarters);
+      setQuarterData(allData);
     };
 
     loadData();
   }, []);
 
-  const quarterMap = {
-    1: "Quarter One ❄️",
-    2: "Quarter Two 🌷",
-    3: "Quarter Three ☀️",
-    4: "Quarter Four 🍁"
-  };
+  if (!gameState) return null;
 
+  const activeQuarter = gameState.currentQuarter;
+
+  // 🔵 Determine Stage
+  let stageLabel = "";
+  if (gameState[`Q${activeQuarter}StrategyOpen`]) {
+    stageLabel = " (Strategy)";
+  } else if (gameState[`Q${activeQuarter}PurchaseOpen`]) {
+    stageLabel = " (Purchase)";
+  } else if (gameState[`Q${activeQuarter}ResultsReleased`]) {
+    stageLabel = " (Results)";
+  }
+
+  // 🔢 Profit Functions
   const getProfit = (storeId, q) => {
-    if (!gameState?.[`Q${q}Released`]) return "";
+    if (!gameState[`Q${q}ResultsReleased`]) return "";
 
     const stores = quarterData?.[q]?.stores || {};
     const final = stores?.[storeId]?.finalRevenue || 0;
     const expenses = stores?.[storeId]?.expenses || 0;
+
     const profit = final - expenses;
 
     return `$${profit.toLocaleString(undefined, {
@@ -62,7 +103,7 @@ export default function LandingPage() {
     let total = 0;
 
     for (let q = 1; q <= 4; q++) {
-      if (!gameState?.[`Q${q}Released`]) continue;
+      if (!gameState[`Q${q}ResultsReleased`]) continue;
 
       const stores = quarterData?.[q]?.stores || {};
       const final = stores?.[storeId]?.finalRevenue || 0;
@@ -74,13 +115,12 @@ export default function LandingPage() {
     return total;
   };
 
-  const isGameComplete = gameState?.Q4Released === true;
-
+  // 🏆 Determine Winner
   let winnerName = "";
   let highestProfit = -Infinity;
 
-  if (isGameComplete) {
-    STORES.forEach(store => {
+  if (gameState.Q4ResultsReleased) {
+    STORES.forEach((store) => {
       const total = getTotalProfit(store.id);
       if (total > highestProfit) {
         highestProfit = total;
@@ -94,7 +134,7 @@ export default function LandingPage() {
 
   const renderRow = (stores) => (
     <div style={styles.row}>
-      {stores.map(store => (
+      {stores.map((store) => (
         <div key={store.id} style={styles.storeCard}>
           <div
             style={styles.imageWrapper}
@@ -110,12 +150,12 @@ export default function LandingPage() {
           <div style={styles.storeName}>{store.name}</div>
 
           <div style={styles.studentList}>
-            {store.students.map(name => (
+            {store.students.map((name) => (
               <div key={name}>{name}</div>
             ))}
           </div>
 
-          {[1,2,3,4].map(q => (
+          {[1, 2, 3, 4].map((q) => (
             <div key={q} style={styles.profitRow}>
               <strong>Profit Q{q}:</strong>{" "}
               {getProfit(store.id, q)}
@@ -140,7 +180,7 @@ export default function LandingPage() {
         <h1 style={styles.banner}>Toy Shop Battle</h1>
 
         <div style={styles.tracker}>
-          {isGameComplete ? (
+          {gameState.Q4ResultsReleased ? (
             <>
               🎉 <strong>All Done!</strong>
               <br />
@@ -149,7 +189,10 @@ export default function LandingPage() {
           ) : (
             <>
               Currently in:{" "}
-              <strong>{quarterMap[gameState?.currentQuarter]}</strong>
+              <strong>
+                {quarterMap[activeQuarter]}
+                {stageLabel}
+              </strong>
             </>
           )}
         </div>
@@ -173,7 +216,8 @@ export default function LandingPage() {
 const styles = {
   pageWrapper: {
     minHeight: "100vh",
-    background: "linear-gradient(180deg, #d385ec 0%, #a3e7f0 100%)"
+    background:
+      "linear-gradient(180deg, #d385ec 0%, #a3e7f0 100%)"
   },
   container: {
     maxWidth: "1200px",
@@ -206,7 +250,9 @@ const styles = {
     width: "320px",
     boxShadow: "0 8px 20px rgba(0,0,0,0.1)"
   },
-  imageWrapper: { cursor: "pointer" },
+  imageWrapper: {
+    cursor: "pointer"
+  },
   storeImage: {
     width: "260px",
     borderRadius: "20px",
