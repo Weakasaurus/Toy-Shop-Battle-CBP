@@ -101,7 +101,7 @@ export default function ShopHub() {
   }, [shopId, navigate]);
 
   // 🔒 Firebase submission lock
- useEffect(() => {
+useEffect(() => {
   const checkLock = async () => {
     const gameSnap = await getDoc(
       doc(db, "gameState", "main")
@@ -128,8 +128,14 @@ export default function ShopHub() {
     const released =
       gameData?.[`Q${activeQuarter}Released`] === true;
 
-    // ONLY lock current quarter
-    if (submitted && !released) {
+    // 🔐 Only lock if:
+    //  - Submitted
+    //  - NOT released
+    //  - AND not final completed quarter
+    if (
+      submitted &&
+      !released
+    ) {
       navigate(`/waiting/${shopId}`, {
         replace: true
       });
@@ -138,7 +144,6 @@ export default function ShopHub() {
 
   checkLock();
 }, [shopId, navigate]);
-
   if (!shop) return <div>Shop Not Found</div>;
 
   const releasedQuarters = [1, 2, 3, 4].filter(
