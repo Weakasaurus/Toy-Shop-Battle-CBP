@@ -2,6 +2,13 @@ import { useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { calculateMarket } from "../engine/marketEngine";
 
+import { db } from "../firebase";
+import {
+  doc,
+  getDoc,
+  updateDoc
+} from "firebase/firestore";
+
 const ALL_SHOPS = [
   "imagination",
   "toytopia",
@@ -18,7 +25,7 @@ export default function WaitingPage() {
   const currentQuarter =
     localStorage.getItem("currentQuarter") || "1";
 
-  /* 🔐 Session login guard */
+  /* 🔐 Session Guard */
   useEffect(() => {
     const authenticated =
       sessionStorage.getItem("authenticatedShop");
@@ -28,74 +35,73 @@ export default function WaitingPage() {
     }
   }, [shopId, navigate]);
 
-  /* 🧠 RUN MARKET ONCE WHEN ALL SUBMITTED */
+  /* 🧠 Check Submissions + Run Market */
   useEffect(() => {
-    const allSubmitted = ALL_SHOPS.every(id =>
-      localStorage.getItem(
-        `${id}-Q${currentQuarter}-submitted`
-      ) === "true"
-    );
-
-    const alreadyCalculated =
-      localStorage.getItem(
-        `Q${currentQuarter}-calculated`
-      ) === "true";
-
-    if (allSubmitted && !alreadyCalculated) {
-      const teams = ALL_SHOPS.map(id => ({
-        id,
-        orders: JSON.parse(
-          localStorage.getItem(
-            `${id}-Q${currentQuarter}-orders`
-          ) || "{}"
-        )
-      }));
-
-      const results = calculateMarket(teams, currentQuarter);
-
-      ALL_SHOPS.forEach(id => {
-        const shopResults = results[id];
-
-        localStorage.setItem(
-          `${id}-Q${currentQuarter}-baseRevenue`,
-          shopResults.baseRevenue
-        );
-
-        localStorage.setItem(
-          `${id}-Q${currentQuarter}-buildingRevenue`,
-          shopResults.buildingRevenue
-        );
-
-        localStorage.setItem(
-          `${id}-Q${currentQuarter}-finalRevenue`,
-          shopResults.finalRevenue
-        );
-
-        localStorage.setItem(
-          `${id}-Q${currentQuarter}-sold`,
-          JSON.stringify(shopResults.sold)
-        );
-      });
-
-      localStorage.setItem(
-        `Q${currentQuarter}-calculated`,
-        "true"
+    const checkAndRunMarket = async () => {
+      const quarterRef = doc(
+        db,
+        "quarters",
+        `Q${currentQuarter}`
       );
-    }
-  }, [currentQuarter]);
 
-  /* 🔓 If released, send to results */
-  useEffect(() => {
-    const released =
-      localStorage.getItem(
-        `Q${currentQuarter}-released`
-      ) === "true";
+      const snap = await getDoc(quarterRef);
+      if (!snap.exists()) return;
 
-    if (released) {
-      navigate(`/results/${shopId}`, {
-        replace: true
-      });
-    }
+      const data = snap.data();
+      const stores = data?.stores || {};
+
+      const allSubmitted = ALL_SHOPS.every(
+        (id) => stores[id]?.submitted === true
+      );
+
+      const alreadyCalculated =
+        data?.calculated === true;
+
+      if (allSubmitted && !alreadyCalculated) {
+        const teams = ALL_SHOPS.map((id) => ({
+          id,
+          orders: stores[id]?.orders || {}
+        }));
+
+        const results = calculateMarket(
+          teams,
+          currentQuarter
+        );
+
+        const updatedStores = { ...stores };
+
+        ALL_SHOPS.forEach((id) => {
+          updatedStores[id] = {
+            ...updatedStores[id],
+            baseRevenue:
+              results[id].baseRevenue,
+            buildingRevenue:
+              results[id].buildingRevenue,
+            finalRevenue:
+              results[id].finalRevenue,
+            sold: results[id].sold
+          };
+        });
+
+        await updateDoc(quarterRef, {
+          stores: updatedStores,
+          calculated: true
+        });
+      }
+
+      const released =
+        localStorage.getItem(
+          `Q${currentQuarter}-released`
+        ) === "true";
+
+      if (released) {
+        navigate(`/results/${shopId}`, {
+          replace: true
+        });
+      }
+    };
+
+    checkAndRunMarket();
   }, [shopId, currentQuarter, navigate]);
 
   return (
@@ -106,8 +112,9 @@ export default function WaitingPage() {
         </h1>
 
         <p style={styles.message}>
-          Your quarter has been submitted.
-          Results will appear once released.
+          Your quarter has been submitted successfully.
+          <br />
+          Results will appear once the coach releases them.
         </p>
 
         <button
@@ -124,7 +131,8 @@ export default function WaitingPage() {
 const styles = {
   wrapper: {
     minHeight: "100vh",
-    background: "linear-gradient(180deg, #d385ec 0%, #a3e7f0 100%)"
+    background:
+      "linear-gradient(180deg, #d385ec 0%, #a3e7f0 100%)"
   },
   container: {
     maxWidth: "800px",
