@@ -82,28 +82,25 @@ export default function PurchasePage() {
     loadOrders();
   }, [shopId, currentQuarter]);
 
-  const handleOrderChange = async (toyId, qty) => {
-    const updated = { ...orders, [toyId]: qty };
-    setOrders(updated);
+ const handleOrderChange = async (toyId, qty) => {
+  const updated = { ...orders, [toyId]: qty };
+  setOrders(updated);
 
-    const quarterRef = doc(db, "quarters", `Q${currentQuarter}`);
-    const snap = await getDoc(quarterRef);
+  const quarterRef = doc(db, "quarters", `Q${currentQuarter}`);
 
-    if (snap.exists()) {
-      await updateDoc(quarterRef, {
-        [`stores.${shopId}.orders`]: updated
-      });
-    } else {
-      await setDoc(quarterRef, {
-        stores: {
-          [shopId]: {
-            orders: updated,
-            submitted: false
-          }
-        }
-      });
-    }
-  };
+  // Always create document if missing
+  await setDoc(
+    quarterRef,
+    {},
+    { merge: true }
+  );
+
+  // Now update store data
+  await updateDoc(quarterRef, {
+    [`stores.${shopId}.orders`]: updated,
+    [`stores.${shopId}.submitted`]: false
+  });
+};
 
   const toyExpenses = TOYS.reduce(
     (sum, toy) =>
@@ -153,29 +150,31 @@ export default function PurchasePage() {
   }, [orders, shopId, currentQuarter]);
 
   const handleSubmit = async () => {
-    if (isOverBudget) {
-      alert("Reduce toy order. You are over budget.");
-      return;
-    }
+  if (isOverBudget) {
+    alert("Reduce toy order. You are over budget.");
+    return;
+  }
 
-    const totalExpenses =
-      toyExpenses + businessExpenses;
+  const totalExpenses =
+    toyExpenses + businessExpenses;
 
-    const quarterRef = doc(db, "quarters", `Q${currentQuarter}`);
+  const quarterRef = doc(db, "quarters", `Q${currentQuarter}`);
 
-    await updateDoc(quarterRef, {
-      [`stores.${shopId}.submitted`]: true,
-      [`stores.${shopId}.expenses`]: totalExpenses
-    });
+  await setDoc(
+    quarterRef,
+    {},
+    { merge: true }
+  );
 
-    sessionStorage.removeItem("authenticatedShop");
+  await updateDoc(quarterRef, {
+    [`stores.${shopId}.submitted`]: true,
+    [`stores.${shopId}.expenses`]: totalExpenses
+  });
 
-    if (currentQuarter === "4") {
-      navigate(`/final/${shopId}`, { replace: true });
-    } else {
-      navigate(`/waiting/${shopId}`, { replace: true });
-    }
-  };
+  sessionStorage.removeItem("authenticatedShop");
+
+  navigate(`/waiting/${shopId}`, { replace: true });
+};
 
   return (
     <div style={styles.wrapper}>
