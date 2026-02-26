@@ -101,7 +101,7 @@ export default function ShopHub() {
   }, [shopId, navigate]);
 
   // 🔒 Firebase submission lock
- uuseEffect(() => {
+ useEffect(() => {
   const checkLock = async () => {
     const gameSnap = await getDoc(
       doc(db, "gameState", "main")
