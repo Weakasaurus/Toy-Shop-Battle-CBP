@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { db } from "../firebase";
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 
 const BUSINESS_BUDGET = 20000;
 
@@ -25,10 +27,12 @@ export default function StrategyPage() {
   const { shopId } = useParams();
   const navigate = useNavigate();
 
-  const currentQuarter =
-    localStorage.getItem("currentQuarter") || "1";
+  const [currentQuarter, setCurrentQuarter] = useState(1);
+  const [rent, setRent] = useState(null);
+  const [labor, setLabor] = useState(null);
+  const [insurance, setInsurance] = useState(null);
 
-  // 🔐 SESSION AUTH GUARD
+  /* 🔐 SESSION AUTH */
   useEffect(() => {
     const authenticated = sessionStorage.getItem("authenticatedShop");
     if (authenticated !== shopId) {
@@ -36,29 +40,37 @@ export default function StrategyPage() {
     }
   }, [shopId, navigate]);
 
-  // 🔒 LOCK IF ALREADY SUBMITTED
- useEffect(() => {
-  const quarters = ["1", "2", "3", "4"];
+  /* 🔄 LOAD GAME STATE + LOCK CHECK */
+  useEffect(() => {
+    const loadState = async () => {
+      const gameSnap = await getDoc(
+        doc(db, "gameState", "main")
+      );
 
-  const hasUnreleasedSubmission = quarters.some(q => {
-    const submitted =
-      localStorage.getItem(`${shopId}-Q${q}-submitted`) === "true";
+      if (gameSnap.exists()) {
+        const gameData = gameSnap.data();
+        setCurrentQuarter(gameData.currentQuarter || 1);
+      }
 
-    const released =
-      localStorage.getItem(`Q${q}-released`) === "true";
+      const quarterSnap = await getDoc(
+        doc(db, "quarters", `Q${currentQuarter}`)
+      );
 
-    return submitted && !released;
-  });
+      if (quarterSnap.exists()) {
+        const data = quarterSnap.data();
+        const storeData = data?.stores?.[shopId];
 
-  if (hasUnreleasedSubmission) {
-    navigate(`/waiting/${shopId}`, { replace: true });
-  }
+        const submitted = storeData?.submitted === true;
+        const released = gameSnap?.data()?.[`Q${currentQuarter}Released`];
 
-}, [shopId, navigate]);
+        if (submitted && !released) {
+          navigate(`/waiting/${shopId}`, { replace: true });
+        }
+      }
+    };
 
-  const [rent, setRent] = useState(null);
-  const [labor, setLabor] = useState(null);
-  const [insurance, setInsurance] = useState(null);
+    loadState();
+  }, [shopId, navigate, currentQuarter]);
 
   const total =
     (rent?.cost || 0) +
@@ -67,7 +79,7 @@ export default function StrategyPage() {
 
   const isOverBudget = total > BUSINESS_BUDGET;
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!rent || !labor || insurance === null) {
       alert("Please choose Rent, Labor, and Insurance.");
       return;
@@ -78,20 +90,19 @@ export default function StrategyPage() {
       return;
     }
 
-    localStorage.setItem(
-      `${shopId}-businessExpenses`,
-      total
+    const quarterRef = doc(
+      db,
+      "quarters",
+      `Q${currentQuarter}`
     );
 
-    localStorage.setItem(
-      `${shopId}-Q${currentQuarter}-buildingMultiplier`,
-      rent.multiplier
-    );
+    await setDoc(quarterRef, {}, { merge: true });
 
-    localStorage.setItem(
-      `${shopId}-Q${currentQuarter}-laborMultiplier`,
-      labor.multiplier
-    );
+    await updateDoc(quarterRef, {
+      [`stores.${shopId}.businessExpenses`]: total,
+      [`stores.${shopId}.buildingMultiplier`]: rent.multiplier,
+      [`stores.${shopId}.laborMultiplier`]: labor.multiplier
+    });
 
     navigate(`/purchase/${shopId}`);
   };
@@ -99,7 +110,6 @@ export default function StrategyPage() {
   const renderSection = (title, options, selected, setSelected) => (
     <div style={styles.section}>
       <h2 style={styles.sectionTitle}>{title}</h2>
-
       {options.map((option, index) => (
         <div
           key={index}
