@@ -11,6 +11,9 @@ import {
   Legend
 } from "recharts";
 
+import { db } from "../firebase";
+import { doc, getDoc } from "firebase/firestore";
+
 const quarterMap = {
   1: "Quarter One ❄️",
   2: "Quarter Two 🌷",
@@ -39,6 +42,8 @@ export default function ResultsPage() {
     1
   );
 
+  const [quarterData, setQuarterData] = useState({});
+
   /* 🔐 Session Guard */
   useEffect(() => {
     const auth = sessionStorage.getItem("authenticatedShop");
@@ -47,12 +52,34 @@ export default function ResultsPage() {
     }
   }, [shopId, navigate]);
 
+  /* 📥 Load Firebase Data */
+  useEffect(() => {
+    const loadData = async () => {
+      let allData = {};
+
+      for (let q = 1; q <= 4; q++) {
+        const snap = await getDoc(
+          doc(db, "quarters", `Q${q}`)
+        );
+
+        if (snap.exists()) {
+          allData[q] = snap.data();
+        }
+      }
+
+      setQuarterData(allData);
+    };
+
+    loadData();
+  }, []);
+
   /* 🔓 Determine Released Quarters */
-  const releasedQuarters = [1, 2, 3, 4].filter(q =>
-    localStorage.getItem(`Q${q}-released`) === "true"
+  const releasedQuarters = [1, 2, 3, 4].filter(
+    (q) =>
+      localStorage.getItem(`Q${q}-released`) ===
+      "true"
   );
 
-  /* 🚫 If requested quarter not released */
   if (!releasedQuarters.includes(viewingQuarter)) {
     return (
       <div style={styles.wrapper}>
@@ -62,7 +89,9 @@ export default function ResultsPage() {
           </h1>
           <button
             style={styles.button}
-            onClick={() => navigate(`/hub/${shopId}`)}
+            onClick={() =>
+              navigate(`/hub/${shopId}`)
+            }
           >
             Back to Hub
           </button>
@@ -71,115 +100,152 @@ export default function ResultsPage() {
     );
   }
 
-  /* 📊 Get Financial Data */
+  const stores =
+    quarterData?.[viewingQuarter]?.stores ||
+    {};
+
   const base = safeNumber(
-    localStorage.getItem(`${shopId}-Q${viewingQuarter}-baseRevenue`)
+    stores?.[shopId]?.baseRevenue
   );
 
   const building = safeNumber(
-    localStorage.getItem(`${shopId}-Q${viewingQuarter}-buildingRevenue`)
+    stores?.[shopId]?.buildingRevenue
   );
 
   const final = safeNumber(
-    localStorage.getItem(`${shopId}-Q${viewingQuarter}-finalRevenue`)
+    stores?.[shopId]?.finalRevenue
   );
 
   const expenses = safeNumber(
-    localStorage.getItem(`${shopId}-Q${viewingQuarter}-expenses`)
+    stores?.[shopId]?.expenses
   );
 
   const profit = final - expenses;
 
-  /* 📈 Graph Data: Show up to highest released quarter */
-  const graphData = releasedQuarters.map(q => {
-    const revenue = safeNumber(
-      localStorage.getItem(`${shopId}-Q${q}-finalRevenue`)
-    );
+  const graphData = releasedQuarters.map(
+    (q) => {
+      const s =
+        quarterData?.[q]?.stores?.[shopId] ||
+        {};
 
-    const expenses = safeNumber(
-      localStorage.getItem(`${shopId}-Q${q}-expenses`)
-    );
+      const revenue =
+        safeNumber(s.finalRevenue);
 
-    return {
-      quarter: quarterMap[q],
-      Revenue: Math.round(revenue * 100) / 100,
-      Profit: Math.round((revenue - expenses) * 100) / 100
-    };
-  });
+      const exp =
+        safeNumber(s.expenses);
+
+      return {
+        quarter: quarterMap[q],
+        Revenue:
+          Math.round(revenue * 100) / 100,
+        Profit:
+          Math.round((revenue - exp) * 100) /
+          100
+      };
+    }
+  );
 
   return (
     <div style={styles.wrapper}>
       <div style={styles.container}>
-
         <h1 style={styles.title}>
           {quarterMap[viewingQuarter]} Results
         </h1>
 
-        {/* Quarter Switch Buttons */}
+        {/* Quarter Switch */}
         <div style={styles.switchRow}>
-  {releasedQuarters.map(q => (
-    <button
-      key={q}
-      style={{
-        ...styles.switchButton,
-        ...(q === viewingQuarter
-          ? styles.activeSwitch
-          : {})
-      }}
-      onClick={() => {
-        localStorage.setItem("viewingQuarter", q);
-        setViewingQuarter(q);
-      }}
-    >
-      {quarterMap[q]}
-    </button>
-  ))}
-</div>
+          {releasedQuarters.map((q) => (
+            <button
+              key={q}
+              style={{
+                ...styles.switchButton,
+                ...(q === viewingQuarter
+                  ? styles.activeSwitch
+                  : {})
+              }}
+              onClick={() => {
+                localStorage.setItem(
+                  "viewingQuarter",
+                  q
+                );
+                setViewingQuarter(q);
+              }}
+            >
+              {quarterMap[q]}
+            </button>
+          ))}
+        </div>
 
         {/* Financial Breakdown */}
         <div style={styles.card}>
           <div style={styles.row}>
             <span>Base Revenue</span>
-            <strong>{formatMoney(base)}</strong>
+            <strong>
+              {formatMoney(base)}
+            </strong>
           </div>
 
           <div style={styles.row}>
             <span>Building Revenue</span>
-            <strong>{formatMoney(building)}</strong>
+            <strong>
+              {formatMoney(building)}
+            </strong>
           </div>
 
           <div style={styles.row}>
             <span>Final Revenue</span>
-            <strong>{formatMoney(final)}</strong>
+            <strong>
+              {formatMoney(final)}
+            </strong>
           </div>
 
           <div style={styles.row}>
             <span>Total Expenses</span>
-            <strong>{formatMoney(expenses)}</strong>
+            <strong>
+              {formatMoney(expenses)}
+            </strong>
           </div>
 
           <div
             style={{
               ...styles.row,
               fontWeight: "bold",
-              color: profit < 0 ? "red" : "green"
+              color:
+                profit < 0
+                  ? "red"
+                  : "green"
             }}
           >
             <span>Profit</span>
-            <strong>{formatMoney(profit)}</strong>
+            <strong>
+              {formatMoney(profit)}
+            </strong>
           </div>
         </div>
 
         {/* Graph */}
         <div style={styles.card}>
-          <h2>Revenue & Profit Over Time</h2>
+          <h2>
+            Revenue & Profit Over Time
+          </h2>
 
-          <ResponsiveContainer width="100%" height={350}>
+          <ResponsiveContainer
+            width="100%"
+            height={350}
+          >
             <LineChart data={graphData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="quarter" />
-              <YAxis tickFormatter={(v) => `$${v.toLocaleString()}`} />
-              <Tooltip formatter={(v) => formatMoney(v)} />
+              <YAxis
+                tickFormatter={(v) =>
+                  `$${v.toLocaleString()}`
+                }
+              />
+              <Tooltip
+                formatter={(v) =>
+                  formatMoney(v)
+                }
+              />
               <Legend />
               <Line
                 type="monotone"
@@ -201,11 +267,12 @@ export default function ResultsPage() {
 
         <button
           style={styles.button}
-          onClick={() => navigate(`/hub/${shopId}`)}
+          onClick={() =>
+            navigate(`/hub/${shopId}`)
+          }
         >
           Back to Hub
         </button>
-
       </div>
     </div>
   );
@@ -214,7 +281,8 @@ export default function ResultsPage() {
 const styles = {
   wrapper: {
     minHeight: "100vh",
-    background: "linear-gradient(180deg, #d385ec 0%, #a3e7f0 100%)"
+    background:
+      "linear-gradient(180deg, #d385ec 0%, #a3e7f0 100%)"
   },
   container: {
     maxWidth: "1000px",
@@ -249,8 +317,7 @@ const styles = {
     padding: "10px 20px",
     borderRadius: "20px",
     fontFamily: "Funkids",
-        fontSize: "28px"
-
+    fontSize: "28px"
   },
   activeSwitch: {
     backgroundColor: "#ffcc66"
