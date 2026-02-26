@@ -98,10 +98,8 @@ export default function WaitingPage() {
           calculated: true
         });
       }
-
 const released =
-  gameState?.[`Q${currentQuarter - 1}Released`] ||
-  gameState?.[`Q${currentQuarter}Released`];
+  gameState?.[`Q${currentQuarter}Released`] === true;
   
   
     };
