@@ -12,7 +12,7 @@ import {
 } from "recharts";
 
 import { db } from "../firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 
 const quarterMap = {
   1: "Quarter One ❄️",
@@ -36,13 +36,9 @@ export default function ResultsPage() {
   const { shopId } = useParams();
   const navigate = useNavigate();
 
-  const [viewingQuarter, setViewingQuarter] = useState(
-    Number(localStorage.getItem("viewingQuarter")) ||
-    Number(localStorage.getItem("currentQuarter")) ||
-    1
-  );
-
+  const [viewingQuarter, setViewingQuarter] = useState(1);
   const [quarterData, setQuarterData] = useState({});
+  const [gameState, setGameState] = useState({});
 
   /* 🔐 Session Guard */
   useEffect(() => {
@@ -52,16 +48,26 @@ export default function ResultsPage() {
     }
   }, [shopId, navigate]);
 
-  /* 📥 Load Firebase Data */
+  /* 🔄 Load game state + quarter data */
   useEffect(() => {
     const loadData = async () => {
-      let allData = {};
+      const gameSnap = await getDoc(
+        doc(db, "gameState", "main")
+      );
 
+      if (gameSnap.exists()) {
+        const data = gameSnap.data();
+        setGameState(data);
+        setViewingQuarter(
+          data.viewingQuarter || data.currentQuarter || 1
+        );
+      }
+
+      let allData = {};
       for (let q = 1; q <= 4; q++) {
         const snap = await getDoc(
           doc(db, "quarters", `Q${q}`)
         );
-
         if (snap.exists()) {
           allData[q] = snap.data();
         }
@@ -73,11 +79,8 @@ export default function ResultsPage() {
     loadData();
   }, []);
 
-  /* 🔓 Determine Released Quarters */
   const releasedQuarters = [1, 2, 3, 4].filter(
-    (q) =>
-      localStorage.getItem(`Q${q}-released`) ===
-      "true"
+    (q) => gameState?.[`Q${q}Released`]
   );
 
   if (!releasedQuarters.includes(viewingQuarter)) {
@@ -89,9 +92,7 @@ export default function ResultsPage() {
           </h1>
           <button
             style={styles.button}
-            onClick={() =>
-              navigate(`/hub/${shopId}`)
-            }
+            onClick={() => navigate(`/hub/${shopId}`)}
           >
             Back to Hub
           </button>
@@ -101,8 +102,7 @@ export default function ResultsPage() {
   }
 
   const stores =
-    quarterData?.[viewingQuarter]?.stores ||
-    {};
+    quarterData?.[viewingQuarter]?.stores || {};
 
   const base = safeNumber(
     stores?.[shopId]?.baseRevenue
@@ -122,28 +122,28 @@ export default function ResultsPage() {
 
   const profit = final - expenses;
 
-  const graphData = releasedQuarters.map(
-    (q) => {
-      const s =
-        quarterData?.[q]?.stores?.[shopId] ||
-        {};
+  const graphData = releasedQuarters.map((q) => {
+    const s =
+      quarterData?.[q]?.stores?.[shopId] || {};
 
-      const revenue =
-        safeNumber(s.finalRevenue);
+    const revenue = safeNumber(s.finalRevenue);
+    const exp = safeNumber(s.expenses);
 
-      const exp =
-        safeNumber(s.expenses);
+    return {
+      quarter: quarterMap[q],
+      Revenue: Math.round(revenue * 100) / 100,
+      Profit:
+        Math.round((revenue - exp) * 100) / 100
+    };
+  });
 
-      return {
-        quarter: quarterMap[q],
-        Revenue:
-          Math.round(revenue * 100) / 100,
-        Profit:
-          Math.round((revenue - exp) * 100) /
-          100
-      };
-    }
-  );
+  const switchQuarter = async (q) => {
+    await updateDoc(
+      doc(db, "gameState", "main"),
+      { viewingQuarter: q }
+    );
+    setViewingQuarter(q);
+  };
 
   return (
     <div style={styles.wrapper}>
@@ -163,13 +163,7 @@ export default function ResultsPage() {
                   ? styles.activeSwitch
                   : {})
               }}
-              onClick={() => {
-                localStorage.setItem(
-                  "viewingQuarter",
-                  q
-                );
-                setViewingQuarter(q);
-              }}
+              onClick={() => switchQuarter(q)}
             >
               {quarterMap[q]}
             </button>
@@ -180,59 +174,41 @@ export default function ResultsPage() {
         <div style={styles.card}>
           <div style={styles.row}>
             <span>Base Revenue</span>
-            <strong>
-              {formatMoney(base)}
-            </strong>
+            <strong>{formatMoney(base)}</strong>
           </div>
 
           <div style={styles.row}>
             <span>Building Revenue</span>
-            <strong>
-              {formatMoney(building)}
-            </strong>
+            <strong>{formatMoney(building)}</strong>
           </div>
 
           <div style={styles.row}>
             <span>Final Revenue</span>
-            <strong>
-              {formatMoney(final)}
-            </strong>
+            <strong>{formatMoney(final)}</strong>
           </div>
 
           <div style={styles.row}>
             <span>Total Expenses</span>
-            <strong>
-              {formatMoney(expenses)}
-            </strong>
+            <strong>{formatMoney(expenses)}</strong>
           </div>
 
           <div
             style={{
               ...styles.row,
               fontWeight: "bold",
-              color:
-                profit < 0
-                  ? "red"
-                  : "green"
+              color: profit < 0 ? "red" : "green"
             }}
           >
             <span>Profit</span>
-            <strong>
-              {formatMoney(profit)}
-            </strong>
+            <strong>{formatMoney(profit)}</strong>
           </div>
         </div>
 
         {/* Graph */}
         <div style={styles.card}>
-          <h2>
-            Revenue & Profit Over Time
-          </h2>
+          <h2>Revenue & Profit Over Time</h2>
 
-          <ResponsiveContainer
-            width="100%"
-            height={350}
-          >
+          <ResponsiveContainer width="100%" height={350}>
             <LineChart data={graphData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="quarter" />
