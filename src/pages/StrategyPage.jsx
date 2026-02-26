@@ -27,6 +27,7 @@ export default function StrategyPage() {
   const { shopId } = useParams();
   const navigate = useNavigate();
 
+  const [gameState, setGameState] = useState(null);
   const [currentQuarter, setCurrentQuarter] = useState(1);
   const [rent, setRent] = useState(null);
   const [labor, setLabor] = useState(null);
@@ -40,46 +41,28 @@ export default function StrategyPage() {
     }
   }, [shopId, navigate]);
 
-  /* 🔄 LOAD GAME STATE + LOCK CHECK */
-useEffect(() => {
-  const checkLock = async () => {
-    const gameSnap = await getDoc(
-      doc(db, "gameState", "main")
-    );
+  /* 🔄 Load Game State + Strategy Gate */
+  useEffect(() => {
+    const loadState = async () => {
+      const snap = await getDoc(doc(db, "gameState", "main"));
+      if (!snap.exists()) return;
 
-    if (!gameSnap.exists()) return;
+      const data = snap.data();
+      setGameState(data);
 
-    const gameData = gameSnap.data();
-    const activeQuarter = gameData.currentQuarter;
+      const activeQuarter = data.currentQuarter;
+      setCurrentQuarter(activeQuarter);
 
-    setCurrentQuarter(activeQuarter);
+      const strategyOpen =
+        data?.[`Q${activeQuarter}StrategyOpen`] === true;
 
-    const quarterSnap = await getDoc(
-      doc(db, "quarters", `Q${activeQuarter}`)
-    );
+      if (!strategyOpen) {
+        navigate(`/hub/${shopId}`, { replace: true });
+      }
+    };
 
-    if (!quarterSnap.exists()) return;
-
-    const quarterData = quarterSnap.data();
-    const storeData =
-      quarterData?.stores?.[shopId];
-
-    const submitted =
-      storeData?.submitted === true;
-
-    const released =
-      gameData?.[`Q${activeQuarter}Released`] === true;
-
-    // LOCK ONLY CURRENT QUARTER
-    if (submitted && !released) {
-      navigate(`/waiting/${shopId}`, {
-        replace: true
-      });
-    }
-  };
-
-  checkLock();
-}, [shopId, navigate]);
+    loadState();
+  }, [shopId, navigate]);
 
   const total =
     (rent?.cost || 0) +
@@ -99,24 +82,20 @@ useEffect(() => {
       return;
     }
 
-    const quarterRef = doc(
-      db,
-      "quarters",
-      `Q${currentQuarter}`
-    );
+    const quarterRef = doc(db, "quarters", `Q${currentQuarter}`);
 
     await setDoc(quarterRef, {}, { merge: true });
 
     await updateDoc(quarterRef, {
-  [`stores.${shopId}.businessExpenses`]: total,
-  [`stores.${shopId}.insuranceCost`]: insurance.cost,
-  [`stores.${shopId}.rentCost`]: rent.cost,
-  [`stores.${shopId}.laborCost`]: labor.cost,
-  [`stores.${shopId}.buildingMultiplier`]: rent.multiplier,
-  [`stores.${shopId}.laborMultiplier`]: labor.multiplier
-});
+      [`stores.${shopId}.businessExpenses`]: total,
+      [`stores.${shopId}.insuranceCost`]: insurance.cost,
+      [`stores.${shopId}.rentCost`]: rent.cost,
+      [`stores.${shopId}.laborCost`]: labor.cost,
+      [`stores.${shopId}.buildingMultiplier`]: rent.multiplier,
+      [`stores.${shopId}.laborMultiplier`]: labor.multiplier
+    });
 
-    navigate(`/purchase/${shopId}`);
+    navigate(`/waiting/${shopId}`);
   };
 
   const renderSection = (title, options, selected, setSelected) => (
@@ -139,6 +118,8 @@ useEffect(() => {
       ))}
     </div>
   );
+
+  if (!gameState) return null;
 
   return (
     <div style={styles.pageWrapper}>
@@ -168,7 +149,7 @@ useEffect(() => {
           style={styles.primaryButton}
           onClick={handleContinue}
         >
-          Continue to Purchase
+          Submit Strategy
         </button>
       </div>
     </div>
