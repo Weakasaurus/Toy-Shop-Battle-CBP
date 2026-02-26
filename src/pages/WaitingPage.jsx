@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { calculateMarket } from "../engine/marketEngine";
 
@@ -22,8 +22,8 @@ export default function WaitingPage() {
   const { shopId } = useParams();
   const navigate = useNavigate();
 
-  const currentQuarter =
-    localStorage.getItem("currentQuarter") || "1";
+  const [currentQuarter, setCurrentQuarter] = useState(1);
+  const [gameState, setGameState] = useState({});
 
   /* 🔐 Session Guard */
   useEffect(() => {
@@ -34,6 +34,23 @@ export default function WaitingPage() {
       navigate(`/login/${shopId}`, { replace: true });
     }
   }, [shopId, navigate]);
+
+  /* 🔄 Load Game State */
+  useEffect(() => {
+    const loadState = async () => {
+      const gameSnap = await getDoc(
+        doc(db, "gameState", "main")
+      );
+
+      if (gameSnap.exists()) {
+        const data = gameSnap.data();
+        setGameState(data);
+        setCurrentQuarter(data.currentQuarter || 1);
+      }
+    };
+
+    loadState();
+  }, []);
 
   /* 🧠 Check Submissions + Run Market */
   useEffect(() => {
@@ -73,12 +90,9 @@ export default function WaitingPage() {
         ALL_SHOPS.forEach((id) => {
           updatedStores[id] = {
             ...updatedStores[id],
-            baseRevenue:
-              results[id].baseRevenue,
-            buildingRevenue:
-              results[id].buildingRevenue,
-            finalRevenue:
-              results[id].finalRevenue,
+            baseRevenue: results[id].baseRevenue,
+            buildingRevenue: results[id].buildingRevenue,
+            finalRevenue: results[id].finalRevenue,
             sold: results[id].sold
           };
         });
@@ -90,9 +104,7 @@ export default function WaitingPage() {
       }
 
       const released =
-        localStorage.getItem(
-          `Q${currentQuarter}-released`
-        ) === "true";
+        gameState?.[`Q${currentQuarter}Released`];
 
       if (released) {
         navigate(`/results/${shopId}`, {
@@ -101,8 +113,10 @@ export default function WaitingPage() {
       }
     };
 
-    checkAndRunMarket();
-  }, [shopId, currentQuarter, navigate]);
+    if (currentQuarter) {
+      checkAndRunMarket();
+    }
+  }, [shopId, currentQuarter, gameState, navigate]);
 
   return (
     <div style={styles.wrapper}>
