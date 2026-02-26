@@ -113,33 +113,36 @@ export default function ShopHub() {
 
   // 🔒 Lock current quarter only (timing safe)
   useEffect(() => {
-    const checkLock = async () => {
-      if (!gameState) return;
+  if (!gameState) return; // 🚨 wait until loaded
 
-      const activeQuarter = gameState.currentQuarter;
+  const checkLock = async () => {
+    const activeQuarter = gameState.currentQuarter;
 
-      const quarterSnap = await getDoc(
-        doc(db, "quarters", `Q${activeQuarter}`)
-      );
+    const quarterSnap = await getDoc(
+      doc(db, "quarters", `Q${activeQuarter}`)
+    );
 
-      if (!quarterSnap.exists()) return;
+    if (!quarterSnap.exists()) return;
 
-      const quarterData = quarterSnap.data();
-      const storeData = quarterData?.stores?.[shopId];
+    const quarterData = quarterSnap.data();
+    const storeData =
+      quarterData?.stores?.[shopId];
 
-      const submitted = storeData?.submitted === true;
-      const released =
-        gameState?.[`Q${activeQuarter}Released`] === true;
+    const submitted =
+      storeData?.submitted === true;
 
-      if (submitted && released === false) {
-        navigate(`/waiting/${shopId}`, {
-          replace: true
-        });
-      }
-    };
+    const released =
+      gameState?.[`Q${activeQuarter}Released`] === true;
 
-    checkLock();
-  }, [gameState, shopId, navigate]);
+    if (submitted && released === false) {
+      navigate(`/waiting/${shopId}`, {
+        replace: true
+      });
+    }
+  };
+
+  checkLock();
+}, [gameState, shopId, navigate]);
 
   if (!shop || !gameState) return null;
 
