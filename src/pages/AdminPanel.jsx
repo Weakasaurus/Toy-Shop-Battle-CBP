@@ -245,11 +245,22 @@ const resetSimulation = async () => {
                       </td>
                                             <td style={styles.cell}>{toy.name}</td>
 
-                      {ALL_SHOPS.map((shop) => (
-                        <td key={shop} style={styles.cell}>
-                          {stores?.[shop]?.sold?.[toy.id] || 0}
-                        </td>
-                      ))}
+                      {ALL_SHOPS.map((shop) => {
+  const sold =
+    stores?.[shop]?.sold?.[toy.id] || 0;
+
+  const ordered =
+    stores?.[shop]?.orders?.[toy.id] || 0;
+
+  return (
+    <td key={shop} style={styles.cell}>
+      {sold}{" "}
+      <span style={{ color: "#777", fontSize: "14px" }}>
+        ({ordered})
+      </span>
+    </td>
+  );
+})}
                     </tr>
                   ))}
                 </tbody>
