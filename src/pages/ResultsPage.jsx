@@ -38,7 +38,7 @@ export default function ResultsPage() {
 
   const [viewingQuarter, setViewingQuarter] = useState(1);
   const [quarterData, setQuarterData] = useState({});
-  const [gameState, setGameState] = useState({});
+  const [gameState, setGameState] = useState(null);
 
   /* 🔐 Session Guard */
   useEffect(() => {
@@ -49,18 +49,19 @@ export default function ResultsPage() {
   }, [shopId, navigate]);
 
   /* 🔄 Load game state + quarter data */
- useEffect(() => {
-  const loadData = async () => {
-    const gameSnap = await getDoc(
-      doc(db, "gameState", "main")
-    );
+  useEffect(() => {
+    const loadData = async () => {
+      const gameSnap = await getDoc(
+        doc(db, "gameState", "main")
+      );
 
-    if (gameSnap.exists()) {
+      if (!gameSnap.exists()) return;
+
       const data = gameSnap.data();
       setGameState(data);
 
       const releasedQuarters = [1, 2, 3, 4].filter(
-        (q) => data[`Q${q}Released`]
+        (q) => data[`Q${q}ResultsReleased`]
       );
 
       const latestReleased =
@@ -69,26 +70,27 @@ export default function ResultsPage() {
           : 1;
 
       setViewingQuarter(latestReleased);
-    }
 
-    let allData = {};
-    for (let q = 1; q <= 4; q++) {
-      const snap = await getDoc(
-        doc(db, "quarters", `Q${q}`)
-      );
-      if (snap.exists()) {
-        allData[q] = snap.data();
+      let allData = {};
+      for (let q = 1; q <= 4; q++) {
+        const snap = await getDoc(
+          doc(db, "quarters", `Q${q}`)
+        );
+        if (snap.exists()) {
+          allData[q] = snap.data();
+        }
       }
-    }
 
-    setQuarterData(allData);
-  };
+      setQuarterData(allData);
+    };
 
-  loadData();
-}, []);
+    loadData();
+  }, []);
+
+  if (!gameState) return null;
 
   const releasedQuarters = [1, 2, 3, 4].filter(
-    (q) => gameState?.[`Q${q}Released`]
+    (q) => gameState?.[`Q${q}ResultsReleased`]
   );
 
   if (!releasedQuarters.includes(viewingQuarter)) {
@@ -115,15 +117,12 @@ export default function ResultsPage() {
   const base = safeNumber(
     stores?.[shopId]?.baseRevenue
   );
-
   const building = safeNumber(
     stores?.[shopId]?.buildingRevenue
   );
-
   const final = safeNumber(
     stores?.[shopId]?.finalRevenue
   );
-
   const expenses = safeNumber(
     stores?.[shopId]?.expenses
   );
@@ -184,22 +183,18 @@ export default function ResultsPage() {
             <span>Base Revenue</span>
             <strong>{formatMoney(base)}</strong>
           </div>
-
           <div style={styles.row}>
             <span>Building Revenue</span>
             <strong>{formatMoney(building)}</strong>
           </div>
-
           <div style={styles.row}>
             <span>Final Revenue</span>
             <strong>{formatMoney(final)}</strong>
           </div>
-
           <div style={styles.row}>
             <span>Total Expenses</span>
             <strong>{formatMoney(expenses)}</strong>
           </div>
-
           <div
             style={{
               ...styles.row,
@@ -225,11 +220,7 @@ export default function ResultsPage() {
                   `$${v.toLocaleString()}`
                 }
               />
-              <Tooltip
-                formatter={(v) =>
-                  formatMoney(v)
-                }
-              />
+              <Tooltip formatter={(v) => formatMoney(v)} />
               <Legend />
               <Line
                 type="monotone"

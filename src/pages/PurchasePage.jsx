@@ -34,6 +34,7 @@ export default function PurchasePage() {
   const { shopId } = useParams();
   const navigate = useNavigate();
 
+  const [gameState, setGameState] = useState(null);
   const [currentQuarter, setCurrentQuarter] = useState(1);
   const [orders, setOrders] = useState({});
   const [predictedRevenue, setPredictedRevenue] = useState(0);
@@ -47,25 +48,34 @@ export default function PurchasePage() {
     }
   }, [shopId, navigate]);
 
-  /* 🔄 LOAD GAME STATE */
+  /* 🔄 Load Game State + Purchase Gate */
   useEffect(() => {
     const loadState = async () => {
-      const gameSnap = await getDoc(
-        doc(db, "gameState", "main")
-      );
+      const snap = await getDoc(doc(db, "gameState", "main"));
+      if (!snap.exists()) return;
 
-      if (gameSnap.exists()) {
-        const data = gameSnap.data();
-        setCurrentQuarter(data.currentQuarter || 1);
+      const data = snap.data();
+      setGameState(data);
+
+      const activeQuarter = data.currentQuarter;
+      setCurrentQuarter(activeQuarter);
+
+      const purchaseOpen =
+        data?.[`Q${activeQuarter}PurchaseOpen`] === true;
+
+      if (!purchaseOpen) {
+        navigate(`/hub/${shopId}`, { replace: true });
       }
     };
 
     loadState();
-  }, []);
+  }, [shopId, navigate]);
 
-  /* 📥 LOAD STORE DATA */
+  /* 📥 Load Store Data */
   useEffect(() => {
     const loadStore = async () => {
+      if (!gameState) return;
+
       const quarterRef = doc(
         db,
         "quarters",
@@ -92,7 +102,9 @@ export default function PurchasePage() {
     };
 
     loadStore();
-  }, [shopId, currentQuarter]);
+  }, [gameState, shopId, currentQuarter]);
+
+  if (!gameState) return null;
 
   const TOYS =
     currentQuarter === 2
@@ -145,7 +157,7 @@ export default function PurchasePage() {
   const isOverBudget =
     toyExpenses > BUDGET;
 
-  /* 🔮 PREDICTION */
+  /* 🔮 Prediction */
   useEffect(() => {
     const runPrediction = async () => {
       const quarterRef = doc(
@@ -166,8 +178,7 @@ export default function PurchasePage() {
           orders:
             id === shopId
               ? orders
-              : data?.stores?.[id]?.orders ||
-                {}
+              : data?.stores?.[id]?.orders || {}
         }));
       }
 
@@ -209,18 +220,10 @@ export default function PurchasePage() {
     await updateDoc(quarterRef, {
       [`stores.${shopId}.submitted`]: true,
       [`stores.${shopId}.expenses`]:
-        totalExpenses,
-      [`stores.${shopId}.businessExpenses`]:
-        businessExpenses
+        totalExpenses
     });
 
-    sessionStorage.removeItem(
-      "authenticatedShop"
-    );
-
-    navigate(`/waiting/${shopId}`, {
-      replace: true
-    });
+    navigate(`/waiting/${shopId}`);
   };
 
   return (
@@ -241,10 +244,7 @@ export default function PurchasePage() {
         </div>
 
         {TOYS.map((toy) => (
-          <div
-            key={toy.id}
-            style={styles.card}
-          >
+          <div key={toy.id} style={styles.card}>
             <div style={styles.toyName}>
               {toy.name}
             </div>
@@ -291,11 +291,7 @@ export default function PurchasePage() {
             Business Expenses: $
             {businessExpenses.toLocaleString()}
           </div>
-          <div
-            style={{
-              fontWeight: "bold"
-            }}
-          >
+          <div style={{ fontWeight: "bold" }}>
             🔮 Estimated Revenue: $
             {predictedRevenue.toLocaleString()}
           </div>
@@ -305,7 +301,7 @@ export default function PurchasePage() {
           style={styles.submit}
           onClick={handleSubmit}
         >
-          Submit
+          Submit Purchase
         </button>
       </div>
     </div>
