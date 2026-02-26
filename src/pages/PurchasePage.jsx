@@ -6,6 +6,14 @@ import { Q3_TOYS } from "../data/q3Toys";
 import { Q4_TOYS } from "../data/q4Toys";
 import { calculateMarket } from "../engine/marketEngine";
 
+import { db } from "../firebase";
+import {
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc
+} from "firebase/firestore";
+
 const ORDER_OPTIONS = [0, 100, 250, 500];
 
 const ALL_SHOPS = [
@@ -32,36 +40,6 @@ export default function PurchasePage() {
   const BUDGET =
     currentQuarter === "4" ? 15000 : 10000;
 
-  const orderKey = `${shopId}-Q${currentQuarter}-orders`;
-
-  /* 🔐 SESSION LOGIN */
-  useEffect(() => {
-    const auth = sessionStorage.getItem("authenticatedShop");
-    if (auth !== shopId) {
-      navigate(`/login/${shopId}`);
-    }
-  }, [shopId, navigate]);
-
-  /* 🔒 LOCK IF SUBMITTED */
-  useEffect(() => {
-    const submitted =
-      localStorage.getItem(
-        `${shopId}-Q${currentQuarter}-submitted`
-      ) === "true";
-
-    const released =
-      localStorage.getItem(
-        `Q${currentQuarter}-released`
-      ) === "true";
-
-    if (submitted && !released) {
-      navigate(`/waiting/${shopId}`, {
-        replace: true
-      });
-    }
-  }, [shopId, currentQuarter, navigate]);
-
-  /* 🎲 SELECT TOYS */
   const TOYS =
     currentQuarter === "2"
       ? Q2_TOYS
@@ -78,18 +56,53 @@ export default function PurchasePage() {
     localStorage.getItem(`${shopId}-businessExpenses`)
   );
 
-  /* 📥 LOAD ORDERS */
+  /* 🔐 SESSION LOGIN */
   useEffect(() => {
-    const saved = JSON.parse(
-      localStorage.getItem(orderKey) || "{}"
-    );
-    setOrders(saved);
-  }, [orderKey]);
+    const auth = sessionStorage.getItem("authenticatedShop");
+    if (auth !== shopId) {
+      navigate(`/login/${shopId}`);
+    }
+  }, [shopId, navigate]);
 
-  const handleOrderChange = (toyId, qty) => {
+  /* 📥 LOAD ORDERS FROM FIREBASE */
+  useEffect(() => {
+    const loadOrders = async () => {
+      const quarterRef = doc(db, "quarters", `Q${currentQuarter}`);
+      const snap = await getDoc(quarterRef);
+
+      if (snap.exists()) {
+        const data = snap.data();
+        const storeData = data?.stores?.[shopId];
+        if (storeData?.orders) {
+          setOrders(storeData.orders);
+        }
+      }
+    };
+
+    loadOrders();
+  }, [shopId, currentQuarter]);
+
+  const handleOrderChange = async (toyId, qty) => {
     const updated = { ...orders, [toyId]: qty };
     setOrders(updated);
-    localStorage.setItem(orderKey, JSON.stringify(updated));
+
+    const quarterRef = doc(db, "quarters", `Q${currentQuarter}`);
+    const snap = await getDoc(quarterRef);
+
+    if (snap.exists()) {
+      await updateDoc(quarterRef, {
+        [`stores.${shopId}.orders`]: updated
+      });
+    } else {
+      await setDoc(quarterRef, {
+        stores: {
+          [shopId]: {
+            orders: updated,
+            submitted: false
+          }
+        }
+      });
+    }
   };
 
   const toyExpenses = TOYS.reduce(
@@ -102,31 +115,44 @@ export default function PurchasePage() {
 
   const isOverBudget = toyExpenses > BUDGET;
 
-  /* 🔮 LIVE PREDICTION (NOT SAVED) */
+  /* 🔮 LIVE PREDICTION (unchanged logic) */
   useEffect(() => {
-    const teams = ALL_SHOPS.map((id) => ({
-      id,
-      orders:
-        id === shopId
-          ? orders
-          : JSON.parse(
-              localStorage.getItem(
-                `${id}-Q${currentQuarter}-orders`
-              ) || "{}"
-            )
-    }));
+    const runPrediction = async () => {
+      const quarterRef = doc(db, "quarters", `Q${currentQuarter}`);
+      const snap = await getDoc(quarterRef);
 
-    const results = calculateMarket(teams, currentQuarter);
+      let teams = [];
 
-    const revenue =
-      results?.[shopId]?.finalRevenue || 0;
+      if (snap.exists()) {
+        const data = snap.data();
+        teams = ALL_SHOPS.map((id) => ({
+          id,
+          orders:
+            id === shopId
+              ? orders
+              : data?.stores?.[id]?.orders || {}
+        }));
+      } else {
+        teams = ALL_SHOPS.map((id) => ({
+          id,
+          orders: id === shopId ? orders : {}
+        }));
+      }
 
-    setPredictedRevenue(
-      Math.round(revenue * 100) / 100
-    );
+      const results = calculateMarket(teams, currentQuarter);
+
+      const revenue =
+        results?.[shopId]?.finalRevenue || 0;
+
+      setPredictedRevenue(
+        Math.round(revenue * 100) / 100
+      );
+    };
+
+    runPrediction();
   }, [orders, shopId, currentQuarter]);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (isOverBudget) {
       alert("Reduce toy order. You are over budget.");
       return;
@@ -135,26 +161,19 @@ export default function PurchasePage() {
     const totalExpenses =
       toyExpenses + businessExpenses;
 
-    localStorage.setItem(
-      `${shopId}-Q${currentQuarter}-expenses`,
-      totalExpenses
-    );
+    const quarterRef = doc(db, "quarters", `Q${currentQuarter}`);
 
-    localStorage.setItem(
-      `${shopId}-Q${currentQuarter}-submitted`,
-      "true"
-    );
+    await updateDoc(quarterRef, {
+      [`stores.${shopId}.submitted`]: true,
+      [`stores.${shopId}.expenses`]: totalExpenses
+    });
 
     sessionStorage.removeItem("authenticatedShop");
 
     if (currentQuarter === "4") {
-      navigate(`/final/${shopId}`, {
-        replace: true
-      });
+      navigate(`/final/${shopId}`, { replace: true });
     } else {
-      navigate(`/waiting/${shopId}`, {
-        replace: true
-      });
+      navigate(`/waiting/${shopId}`, { replace: true });
     }
   };
 
