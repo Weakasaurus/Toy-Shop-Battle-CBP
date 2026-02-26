@@ -43,26 +43,38 @@ export default function StrategyPage() {
 
   /* 🔄 Load Game State + Strategy Gate */
   useEffect(() => {
-    const loadState = async () => {
-      const snap = await getDoc(doc(db, "gameState", "main"));
-      if (!snap.exists()) return;
+  const loadState = async () => {
+    const gameSnap = await getDoc(doc(db, "gameState", "main"));
+    if (!gameSnap.exists()) return;
 
-      const data = snap.data();
-      setGameState(data);
+    const gameData = gameSnap.data();
+    setGameState(gameData);
 
-      const activeQuarter = data.currentQuarter;
-      setCurrentQuarter(activeQuarter);
+    const activeQuarter = gameData.currentQuarter;
+    setCurrentQuarter(activeQuarter);
 
-      const strategyOpen =
-        data?.[`Q${activeQuarter}StrategyOpen`] === true;
+    const strategyOpen =
+      gameData?.[`Q${activeQuarter}StrategyOpen`] === true;
 
-      if (!strategyOpen) {
-        navigate(`/hub/${shopId}`, { replace: true });
-      }
-    };
+    const quarterSnap = await getDoc(
+      doc(db, "quarters", `Q${activeQuarter}`)
+    );
 
-    loadState();
-  }, [shopId, navigate]);
+    let alreadySubmitted = false;
+
+    if (quarterSnap.exists()) {
+      const data = quarterSnap.data();
+      const storeData = data?.stores?.[shopId];
+      alreadySubmitted = storeData?.strategySubmitted === true;
+    }
+
+    if (!strategyOpen || alreadySubmitted) {
+      navigate(`/hub/${shopId}`, { replace: true });
+    }
+  };
+
+  loadState();
+}, [shopId, navigate]);
 
   const total =
     (rent?.cost || 0) +
@@ -87,13 +99,14 @@ export default function StrategyPage() {
     await setDoc(quarterRef, {}, { merge: true });
 
     await updateDoc(quarterRef, {
-      [`stores.${shopId}.businessExpenses`]: total,
-      [`stores.${shopId}.insuranceCost`]: insurance.cost,
-      [`stores.${shopId}.rentCost`]: rent.cost,
-      [`stores.${shopId}.laborCost`]: labor.cost,
-      [`stores.${shopId}.buildingMultiplier`]: rent.multiplier,
-      [`stores.${shopId}.laborMultiplier`]: labor.multiplier
-    });
+  [`stores.${shopId}.strategySubmitted`]: true,
+  [`stores.${shopId}.businessExpenses`]: total,
+  [`stores.${shopId}.insuranceCost`]: insurance.cost,
+  [`stores.${shopId}.rentCost`]: rent.cost,
+  [`stores.${shopId}.laborCost`]: labor.cost,
+  [`stores.${shopId}.buildingMultiplier`]: rent.multiplier,
+  [`stores.${shopId}.laborMultiplier`]: labor.multiplier
+});
 
     navigate(`/waiting/${shopId}`);
   };

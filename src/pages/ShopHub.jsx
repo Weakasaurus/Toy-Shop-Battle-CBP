@@ -92,7 +92,7 @@ export default function ShopHub() {
 
   const [gameState, setGameState] = useState(null);
 
-  // 🔐 Session Guard
+  /* 🔐 Session Guard */
   useEffect(() => {
     const auth = sessionStorage.getItem("authenticatedShop");
     if (auth !== shopId) {
@@ -100,7 +100,7 @@ export default function ShopHub() {
     }
   }, [shopId, navigate]);
 
-  // 🔄 Load game state
+  /* 🔄 Load Game State */
   useEffect(() => {
     const loadState = async () => {
       const snap = await getDoc(doc(db, "gameState", "main"));
@@ -111,48 +111,25 @@ export default function ShopHub() {
     loadState();
   }, []);
 
-  // 🔒 Lock current quarter only (timing safe)
-  useEffect(() => {
-  if (!gameState) return; // 🚨 wait until loaded
-
-  const checkLock = async () => {
-    const activeQuarter = gameState.currentQuarter;
-
-    const quarterSnap = await getDoc(
-      doc(db, "quarters", `Q${activeQuarter}`)
-    );
-
-    if (!quarterSnap.exists()) return;
-
-    const quarterData = quarterSnap.data();
-    const storeData =
-      quarterData?.stores?.[shopId];
-
-    const submitted =
-      storeData?.submitted === true;
-
-    const released =
-      gameState?.[`Q${activeQuarter}Released`] === true;
-
-    if (submitted && released === false) {
-      navigate(`/waiting/${shopId}`, {
-        replace: true
-      });
-    }
-  };
-
-  checkLock();
-}, [gameState, shopId, navigate]);
-
   if (!shop || !gameState) return null;
 
   const activeQuarter = gameState.currentQuarter;
 
+  const strategyOpen =
+    gameState[`Q${activeQuarter}StrategyOpen`] === true;
+
+  const purchaseOpen =
+    gameState[`Q${activeQuarter}PurchaseOpen`] === true;
+
+  const resultsReleased =
+    gameState[`Q${activeQuarter}ResultsReleased`] === true;
+
   const releasedQuarters = [1, 2, 3, 4].filter(
-    (q) => gameState[`Q${q}Released`]
+    (q) => gameState[`Q${q}ResultsReleased`]
   );
 
-  const isFinalReleased = gameState.Q4Released === true;
+  const isFinalComplete =
+    gameState.Q4ResultsReleased === true;
 
   return (
     <div style={styles.wrapper}>
@@ -160,7 +137,6 @@ export default function ShopHub() {
         <div style={styles.layout}>
           <div style={styles.left}>
             <h1 style={styles.title}>About {shop.name}</h1>
-
             <div
               style={styles.story}
               dangerouslySetInnerHTML={{ __html: shop.story }}
@@ -185,36 +161,54 @@ export default function ShopHub() {
         </div>
 
         <div style={styles.buttons}>
-          {!isFinalReleased &&
-            !gameState[`Q${activeQuarter}Released`] && (
-              <button
-                style={styles.primary}
-                onClick={() =>
-                  navigate(`/strategy/${shopId}`)
-                }
-              >
-                Start Current Quarter
-              </button>
-            )}
-
-          {releasedQuarters.map((q) => (
+          {/* Strategy Stage */}
+          {strategyOpen && (
             <button
-              key={q}
-              style={styles.secondary}
-              onClick={() =>
-                navigate(`/results/${shopId}`)
-              }
+              style={styles.primary}
+              onClick={() => navigate(`/strategy/${shopId}`)}
             >
-              View {quarterMap[q]} Results
+              Start Strategy
             </button>
-          ))}
+          )}
 
-          {isFinalReleased && (
+          {/* Purchase Stage */}
+          {purchaseOpen && (
+            <button
+              style={styles.primary}
+              onClick={() => navigate(`/purchase/${shopId}`)}
+            >
+              Start Purchase
+            </button>
+          )}
+
+          {/* Results Stage */}
+          {resultsReleased && (
+            <button
+              style={styles.secondary}
+              onClick={() => navigate(`/results/${shopId}`)}
+            >
+              View {quarterMap[activeQuarter]} Results
+            </button>
+          )}
+
+          {/* Previous Results */}
+          {releasedQuarters
+            .filter((q) => q !== activeQuarter)
+            .map((q) => (
+              <button
+                key={q}
+                style={styles.secondary}
+                onClick={() => navigate(`/results/${shopId}`)}
+              >
+                View {quarterMap[q]} Results
+              </button>
+            ))}
+
+          {/* Final Summary */}
+          {isFinalComplete && (
             <button
               style={styles.final}
-              onClick={() =>
-                navigate(`/final/${shopId}`)
-              }
+              onClick={() => navigate(`/final/${shopId}`)}
             >
               🎉 View Final Summary 🎉
             </button>
