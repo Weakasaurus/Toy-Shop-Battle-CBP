@@ -103,11 +103,7 @@ const released =
   gameState?.[`Q${currentQuarter - 1}Released`] ||
   gameState?.[`Q${currentQuarter}Released`];
   
-      if (released) {
-        navigate(`/results/${shopId}`, {
-          replace: true
-        });
-      }
+  
     };
 
     if (currentQuarter) {
