@@ -1,8 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { db } from "../firebase";
 import { doc, getDoc } from "firebase/firestore";
-import useGameState from "../useGameState";
 
 const quarterMap = {
   1: "Quarter One ❄️",
@@ -90,9 +89,10 @@ export default function ShopHub() {
   const { shopId } = useParams();
   const navigate = useNavigate();
   const shop = SHOP_DATA[shopId];
-  const { currentQuarter, released } = useGameState();
 
-  // 🔐 Session login
+  const [gameState, setGameState] = useState(null);
+
+  // 🔐 Session Guard
   useEffect(() => {
     const auth = sessionStorage.getItem("authenticatedShop");
     if (auth !== shopId) {
@@ -100,70 +100,67 @@ export default function ShopHub() {
     }
   }, [shopId, navigate]);
 
-  // 🔒 Firebase submission lock
-useEffect(() => {
-  const checkLock = async () => {
-    const gameSnap = await getDoc(
-      doc(db, "gameState", "main")
-    );
+  // 🔄 Load game state
+  useEffect(() => {
+    const loadState = async () => {
+      const snap = await getDoc(doc(db, "gameState", "main"));
+      if (snap.exists()) {
+        setGameState(snap.data());
+      }
+    };
+    loadState();
+  }, []);
 
-    if (!gameSnap.exists()) return;
+  // 🔒 Lock current quarter only (timing safe)
+  useEffect(() => {
+    const checkLock = async () => {
+      if (!gameState) return;
 
-    const gameData = gameSnap.data();
-    const activeQuarter = gameData.currentQuarter;
+      const activeQuarter = gameState.currentQuarter;
 
-    const quarterSnap = await getDoc(
-      doc(db, "quarters", `Q${activeQuarter}`)
-    );
+      const quarterSnap = await getDoc(
+        doc(db, "quarters", `Q${activeQuarter}`)
+      );
 
-    if (!quarterSnap.exists()) return;
+      if (!quarterSnap.exists()) return;
 
-    const quarterData = quarterSnap.data();
-    const storeData =
-      quarterData?.stores?.[shopId];
+      const quarterData = quarterSnap.data();
+      const storeData = quarterData?.stores?.[shopId];
 
-    const submitted =
-      storeData?.submitted === true;
+      const submitted = storeData?.submitted === true;
+      const released =
+        gameState?.[`Q${activeQuarter}Released`] === true;
 
-    const released =
-      gameData?.[`Q${activeQuarter}Released`] === true;
+      if (submitted && released === false) {
+        navigate(`/waiting/${shopId}`, {
+          replace: true
+        });
+      }
+    };
 
-    // 🔐 Only lock if:
-    //  - Submitted
-    //  - NOT released
-    //  - AND not final completed quarter
-    if (
-      submitted &&
-      !released
-    ) {
-      navigate(`/waiting/${shopId}`, {
-        replace: true
-      });
-    }
-  };
+    checkLock();
+  }, [gameState, shopId, navigate]);
 
-  checkLock();
-}, [shopId, navigate]);
-  if (!shop) return <div>Shop Not Found</div>;
+  if (!shop || !gameState) return null;
+
+  const activeQuarter = gameState.currentQuarter;
 
   const releasedQuarters = [1, 2, 3, 4].filter(
-    (q) => released[q]
+    (q) => gameState[`Q${q}Released`]
   );
+
+  const isFinalReleased = gameState.Q4Released === true;
 
   return (
     <div style={styles.wrapper}>
       <div style={styles.container}>
         <div style={styles.layout}>
           <div style={styles.left}>
-            <h1 style={styles.title}>
-              About {shop.name}
-            </h1>
+            <h1 style={styles.title}>About {shop.name}</h1>
 
             <div
               style={styles.story}
-              dangerouslySetInnerHTML={{
-                __html: shop.story
-              }}
+              dangerouslySetInnerHTML={{ __html: shop.story }}
             />
           </div>
 
@@ -185,16 +182,17 @@ useEffect(() => {
         </div>
 
         <div style={styles.buttons}>
-          {!released[currentQuarter] && (
-            <button
-              style={styles.primary}
-              onClick={() =>
-                navigate(`/strategy/${shopId}`)
-              }
-            >
-              Start Current Quarter
-            </button>
-          )}
+          {!isFinalReleased &&
+            !gameState[`Q${activeQuarter}Released`] && (
+              <button
+                style={styles.primary}
+                onClick={() =>
+                  navigate(`/strategy/${shopId}`)
+                }
+              >
+                Start Current Quarter
+              </button>
+            )}
 
           {releasedQuarters.map((q) => (
             <button
@@ -208,7 +206,7 @@ useEffect(() => {
             </button>
           ))}
 
-          {released[4] && (
+          {isFinalReleased && (
             <button
               style={styles.final}
               onClick={() =>
@@ -280,9 +278,8 @@ const styles = {
   },
   secondary: {
     padding: "18px",
-        fontSize: "24px",
-
     fontFamily: "Funkids",
+    fontSize: "24px",
     borderRadius: "20px"
   },
   final: {
