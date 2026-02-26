@@ -68,7 +68,12 @@ export default function StrategyPage() {
       alreadySubmitted = storeData?.strategySubmitted === true;
     }
 
-    if (!strategyOpen || alreadySubmitted) {
+    if (alreadySubmitted) {
+      navigate(`/waiting/${shopId}`, { replace: true });
+      return;
+    }
+
+    if (!strategyOpen) {
       navigate(`/hub/${shopId}`, { replace: true });
     }
   };

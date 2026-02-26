@@ -48,7 +48,7 @@ export default function PurchasePage() {
     }
   }, [shopId, navigate]);
 
-  /* 🔄 Load Game State + Purchase Gate */
+  /* 🔄 Load Game State + Gate Logic */
   useEffect(() => {
     const loadState = async () => {
       const snap = await getDoc(doc(db, "gameState", "main"));
@@ -63,8 +63,32 @@ export default function PurchasePage() {
       const purchaseOpen =
         data?.[`Q${activeQuarter}PurchaseOpen`] === true;
 
+      const quarterSnap = await getDoc(
+        doc(db, "quarters", `Q${activeQuarter}`)
+      );
+
+      let alreadySubmitted = false;
+
+      if (quarterSnap.exists()) {
+        const quarterData = quarterSnap.data();
+        const storeData =
+          quarterData?.stores?.[shopId];
+
+        alreadySubmitted =
+          storeData?.submitted === true;
+      }
+
+      if (alreadySubmitted) {
+        navigate(`/waiting/${shopId}`, {
+          replace: true
+        });
+        return;
+      }
+
       if (!purchaseOpen) {
-        navigate(`/hub/${shopId}`, { replace: true });
+        navigate(`/hub/${shopId}`, {
+          replace: true
+        });
       }
     };
 
@@ -104,62 +128,11 @@ export default function PurchasePage() {
     loadStore();
   }, [gameState, shopId, currentQuarter]);
 
-  if (!gameState) return null;
-
-  const TOYS =
-    currentQuarter === 2
-      ? Q2_TOYS
-      : currentQuarter === 3
-      ? Q3_TOYS
-      : currentQuarter === 4
-      ? Q4_TOYS
-      : Q1_TOYS;
-
-  const BUDGET =
-    currentQuarter === 4 ? 15000 : 10000;
-
-  const handleOrderChange = async (
-    toyId,
-    qty
-  ) => {
-    const updated = {
-      ...orders,
-      [toyId]: qty
-    };
-    setOrders(updated);
-
-    const quarterRef = doc(
-      db,
-      "quarters",
-      `Q${currentQuarter}`
-    );
-
-    await setDoc(
-      quarterRef,
-      {},
-      { merge: true }
-    );
-
-    await updateDoc(quarterRef, {
-      [`stores.${shopId}.orders`]: updated,
-      [`stores.${shopId}.submitted`]: false
-    });
-  };
-
-  const toyExpenses = TOYS.reduce(
-    (sum, toy) =>
-      sum +
-      safeNumber(orders[toy.id]) *
-        safeNumber(toy.unitPrice),
-    0
-  );
-
-  const isOverBudget =
-    toyExpenses > BUDGET;
-
   /* 🔮 Prediction */
   useEffect(() => {
     const runPrediction = async () => {
+      if (!gameState) return;
+
       const quarterRef = doc(
         db,
         "quarters",
@@ -188,17 +161,68 @@ export default function PurchasePage() {
       );
 
       const revenue =
-        results?.[shopId]
-          ?.finalRevenue || 0;
+        results?.[shopId]?.finalRevenue || 0;
 
       setPredictedRevenue(
-        Math.round(revenue * 100) /
-          100
+        Math.round(revenue * 100) / 100
       );
     };
 
     runPrediction();
-  }, [orders, shopId, currentQuarter]);
+  }, [orders, shopId, currentQuarter, gameState]);
+
+  if (!gameState) return null;
+
+  const TOYS =
+    currentQuarter === 2
+      ? Q2_TOYS
+      : currentQuarter === 3
+      ? Q3_TOYS
+      : currentQuarter === 4
+      ? Q4_TOYS
+      : Q1_TOYS;
+
+  const BUDGET =
+    currentQuarter === 4 ? 15000 : 10000;
+
+  const toyExpenses = TOYS.reduce(
+    (sum, toy) =>
+      sum +
+      safeNumber(orders[toy.id]) *
+        safeNumber(toy.unitPrice),
+    0
+  );
+
+  const isOverBudget =
+    toyExpenses > BUDGET;
+
+  const handleOrderChange = async (
+    toyId,
+    qty
+  ) => {
+    const updated = {
+      ...orders,
+      [toyId]: qty
+    };
+    setOrders(updated);
+
+    const quarterRef = doc(
+      db,
+      "quarters",
+      `Q${currentQuarter}`
+    );
+
+    await setDoc(
+      quarterRef,
+      {},
+      { merge: true }
+    );
+
+    await updateDoc(quarterRef, {
+      [`stores.${shopId}.orders`]: updated,
+      [`stores.${shopId}.submitted`]: false
+    });
+  };
 
   const handleSubmit = async () => {
     if (isOverBudget) {
@@ -244,7 +268,10 @@ export default function PurchasePage() {
         </div>
 
         {TOYS.map((toy) => (
-          <div key={toy.id} style={styles.card}>
+          <div
+            key={toy.id}
+            style={styles.card}
+          >
             <div style={styles.toyName}>
               {toy.name}
             </div>
