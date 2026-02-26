@@ -34,27 +34,10 @@ export default function PurchasePage() {
   const { shopId } = useParams();
   const navigate = useNavigate();
 
-  const currentQuarter =
-    localStorage.getItem("currentQuarter") || "1";
-
-  const BUDGET =
-    currentQuarter === "4" ? 15000 : 10000;
-
-  const TOYS =
-    currentQuarter === "2"
-      ? Q2_TOYS
-      : currentQuarter === "3"
-      ? Q3_TOYS
-      : currentQuarter === "4"
-      ? Q4_TOYS
-      : Q1_TOYS;
-
+  const [currentQuarter, setCurrentQuarter] = useState(1);
   const [orders, setOrders] = useState({});
   const [predictedRevenue, setPredictedRevenue] = useState(0);
-
-  const businessExpenses = safeNumber(
-    localStorage.getItem(`${shopId}-businessExpenses`)
-  );
+  const [businessExpenses, setBusinessExpenses] = useState(0);
 
   /* 🔐 SESSION LOGIN */
   useEffect(() => {
@@ -64,43 +47,92 @@ export default function PurchasePage() {
     }
   }, [shopId, navigate]);
 
-  /* 📥 LOAD ORDERS FROM FIREBASE */
+  /* 🔄 LOAD GAME STATE */
   useEffect(() => {
-    const loadOrders = async () => {
-      const quarterRef = doc(db, "quarters", `Q${currentQuarter}`);
+    const loadState = async () => {
+      const gameSnap = await getDoc(
+        doc(db, "gameState", "main")
+      );
+
+      if (gameSnap.exists()) {
+        const data = gameSnap.data();
+        setCurrentQuarter(data.currentQuarter || 1);
+      }
+    };
+
+    loadState();
+  }, []);
+
+  /* 📥 LOAD STORE DATA */
+  useEffect(() => {
+    const loadStore = async () => {
+      const quarterRef = doc(
+        db,
+        "quarters",
+        `Q${currentQuarter}`
+      );
+
       const snap = await getDoc(quarterRef);
 
       if (snap.exists()) {
         const data = snap.data();
-        const storeData = data?.stores?.[shopId];
+        const storeData =
+          data?.stores?.[shopId];
+
         if (storeData?.orders) {
           setOrders(storeData.orders);
+        }
+
+        if (storeData?.businessExpenses) {
+          setBusinessExpenses(
+            storeData.businessExpenses
+          );
         }
       }
     };
 
-    loadOrders();
+    loadStore();
   }, [shopId, currentQuarter]);
 
- const handleOrderChange = async (toyId, qty) => {
-  const updated = { ...orders, [toyId]: qty };
-  setOrders(updated);
+  const TOYS =
+    currentQuarter === 2
+      ? Q2_TOYS
+      : currentQuarter === 3
+      ? Q3_TOYS
+      : currentQuarter === 4
+      ? Q4_TOYS
+      : Q1_TOYS;
 
-  const quarterRef = doc(db, "quarters", `Q${currentQuarter}`);
+  const BUDGET =
+    currentQuarter === 4 ? 15000 : 10000;
 
-  // Always create document if missing
-  await setDoc(
-    quarterRef,
-    {},
-    { merge: true }
-  );
+  const handleOrderChange = async (
+    toyId,
+    qty
+  ) => {
+    const updated = {
+      ...orders,
+      [toyId]: qty
+    };
+    setOrders(updated);
 
-  // Now update store data
-  await updateDoc(quarterRef, {
-    [`stores.${shopId}.orders`]: updated,
-    [`stores.${shopId}.submitted`]: false
-  });
-};
+    const quarterRef = doc(
+      db,
+      "quarters",
+      `Q${currentQuarter}`
+    );
+
+    await setDoc(
+      quarterRef,
+      {},
+      { merge: true }
+    );
+
+    await updateDoc(quarterRef, {
+      [`stores.${shopId}.orders`]: updated,
+      [`stores.${shopId}.submitted`]: false
+    });
+  };
 
   const toyExpenses = TOYS.reduce(
     (sum, toy) =>
@@ -110,39 +142,47 @@ export default function PurchasePage() {
     0
   );
 
-  const isOverBudget = toyExpenses > BUDGET;
+  const isOverBudget =
+    toyExpenses > BUDGET;
 
-  /* 🔮 LIVE PREDICTION (unchanged logic) */
+  /* 🔮 PREDICTION */
   useEffect(() => {
     const runPrediction = async () => {
-      const quarterRef = doc(db, "quarters", `Q${currentQuarter}`);
+      const quarterRef = doc(
+        db,
+        "quarters",
+        `Q${currentQuarter}`
+      );
+
       const snap = await getDoc(quarterRef);
 
       let teams = [];
 
       if (snap.exists()) {
         const data = snap.data();
+
         teams = ALL_SHOPS.map((id) => ({
           id,
           orders:
             id === shopId
               ? orders
-              : data?.stores?.[id]?.orders || {}
-        }));
-      } else {
-        teams = ALL_SHOPS.map((id) => ({
-          id,
-          orders: id === shopId ? orders : {}
+              : data?.stores?.[id]?.orders ||
+                {}
         }));
       }
 
-      const results = calculateMarket(teams, currentQuarter);
+      const results = calculateMarket(
+        teams,
+        currentQuarter
+      );
 
       const revenue =
-        results?.[shopId]?.finalRevenue || 0;
+        results?.[shopId]
+          ?.finalRevenue || 0;
 
       setPredictedRevenue(
-        Math.round(revenue * 100) / 100
+        Math.round(revenue * 100) /
+          100
       );
     };
 
@@ -150,36 +190,45 @@ export default function PurchasePage() {
   }, [orders, shopId, currentQuarter]);
 
   const handleSubmit = async () => {
-  if (isOverBudget) {
-    alert("Reduce toy order. You are over budget.");
-    return;
-  }
+    if (isOverBudget) {
+      alert(
+        "Reduce toy order. You are over budget."
+      );
+      return;
+    }
 
-  const totalExpenses =
-    toyExpenses + businessExpenses;
+    const totalExpenses =
+      toyExpenses + businessExpenses;
 
-  const quarterRef = doc(db, "quarters", `Q${currentQuarter}`);
+    const quarterRef = doc(
+      db,
+      "quarters",
+      `Q${currentQuarter}`
+    );
 
-  await setDoc(
-    quarterRef,
-    {},
-    { merge: true }
-  );
+    await updateDoc(quarterRef, {
+      [`stores.${shopId}.submitted`]: true,
+      [`stores.${shopId}.expenses`]:
+        totalExpenses,
+      [`stores.${shopId}.businessExpenses`]:
+        businessExpenses
+    });
 
-  await updateDoc(quarterRef, {
-    [`stores.${shopId}.submitted`]: true,
-    [`stores.${shopId}.expenses`]: totalExpenses
-  });
+    sessionStorage.removeItem(
+      "authenticatedShop"
+    );
 
-  sessionStorage.removeItem("authenticatedShop");
-
-  navigate(`/waiting/${shopId}`, { replace: true });
-};
+    navigate(`/waiting/${shopId}`, {
+      replace: true
+    });
+  };
 
   return (
     <div style={styles.wrapper}>
       <div style={styles.container}>
-        <h1 style={styles.title}>Purchase Order</h1>
+        <h1 style={styles.title}>
+          Purchase Order
+        </h1>
 
         <div style={styles.budgetBox}>
           Q{currentQuarter} Budget: $
@@ -192,33 +241,43 @@ export default function PurchasePage() {
         </div>
 
         {TOYS.map((toy) => (
-          <div key={toy.id} style={styles.card}>
+          <div
+            key={toy.id}
+            style={styles.card}
+          >
             <div style={styles.toyName}>
               {toy.name}
             </div>
 
             <div style={styles.priceLine}>
-              Unit: ${toy.unitPrice} | Sell: $
-              {toy.sellingPrice}
+              Unit: ${toy.unitPrice} |
+              Sell: ${toy.sellingPrice}
             </div>
 
             <div style={styles.quantityRow}>
-              {ORDER_OPTIONS.map((qty) => (
-                <button
-                  key={qty}
-                  style={{
-                    ...styles.qtyButton,
-                    ...(orders[toy.id] === qty
-                      ? styles.selected
-                      : {})
-                  }}
-                  onClick={() =>
-                    handleOrderChange(toy.id, qty)
-                  }
-                >
-                  {qty}
-                </button>
-              ))}
+              {ORDER_OPTIONS.map(
+                (qty) => (
+                  <button
+                    key={qty}
+                    style={{
+                      ...styles.qtyButton,
+                      ...(orders[
+                        toy.id
+                      ] === qty
+                        ? styles.selected
+                        : {})
+                    }}
+                    onClick={() =>
+                      handleOrderChange(
+                        toy.id,
+                        qty
+                      )
+                    }
+                  >
+                    {qty}
+                  </button>
+                )
+              )}
             </div>
           </div>
         ))}
@@ -232,7 +291,11 @@ export default function PurchasePage() {
             Business Expenses: $
             {businessExpenses.toLocaleString()}
           </div>
-          <div style={{ fontWeight: "bold" }}>
+          <div
+            style={{
+              fontWeight: "bold"
+            }}
+          >
             🔮 Estimated Revenue: $
             {predictedRevenue.toLocaleString()}
           </div>
@@ -294,7 +357,8 @@ const styles = {
   },
   quantityRow: {
     display: "grid",
-    gridTemplateColumns: "repeat(4, 1fr)",
+    gridTemplateColumns:
+      "repeat(4, 1fr)",
     gap: "10px"
   },
   qtyButton: {
