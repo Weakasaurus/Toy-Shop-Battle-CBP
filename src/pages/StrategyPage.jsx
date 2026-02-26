@@ -105,10 +105,18 @@ export default function StrategyPage() {
 
     await updateDoc(quarterRef, {
   [`stores.${shopId}.strategySubmitted`]: true,
+
   [`stores.${shopId}.businessExpenses`]: total,
-  [`stores.${shopId}.insuranceCost`]: insurance.cost,
+
   [`stores.${shopId}.rentCost`]: rent.cost,
+  [`stores.${shopId}.rentLabel`]: rent.label,
+
   [`stores.${shopId}.laborCost`]: labor.cost,
+  [`stores.${shopId}.laborLabel`]: labor.label,
+
+  [`stores.${shopId}.insuranceCost`]: insurance.cost,
+  [`stores.${shopId}.insuranceLabel`]: insurance.label,
+
   [`stores.${shopId}.buildingMultiplier`]: rent.multiplier,
   [`stores.${shopId}.laborMultiplier`]: labor.multiplier
 });
