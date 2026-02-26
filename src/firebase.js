@@ -12,3 +12,13 @@ apiKey: "AIzaSyCuShXScvGDbQao1mDM2t1TFrohJ8zCJgs",
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
+
+import { doc, setDoc } from "firebase/firestore";
+
+async function testWrite() {
+  await setDoc(doc(db, "testCollection", "testDoc"), {
+    working: true
+  });
+}
+
+testWrite();
