@@ -1,67 +1,55 @@
 import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { db } from "../firebase";
+import { doc, getDoc } from "firebase/firestore";
 
 const STORES = [
-  {
-    id: "imagination",
-    name: "Imagination Station",
-    students: ["Coach Store"]
-  },
-  {
-    id: "toytopia",
-    name: "Toytopia",
-    students: ["Sebastian", "Amara", "Brooke", "Lizzie", "Pedro"]
-  },
-  {
-    id: "giggles",
-    name: "Giggles and Gizmos",
-    students: ["Levi", "Zoe", "Tiernan", "Tyler", "Nico"]
-  },
-  {
-    id: "tinkertown",
-    name: "Tinkertown Toys",
-    students: ["Zenovia", "Miera", "Silas", "Teddy"]
-  },
-  {
-    id: "playmotion",
-    name: "PlayMotion",
-    students: ["Maggie", "Aria", "Vincent", "Evan", "Jace"]
-  },
-  {
-    id: "cranium",
-    name: "Cranium Emporium",
-    students: ["Django", "Keane", "Evangeline", "Tigo"]
-  }
+  { id: "imagination", name: "Imagination Station", students: ["Coach Store"] },
+  { id: "toytopia", name: "Toytopia", students: ["Sebastian", "Amara", "Brooke", "Lizzie", "Pedro"] },
+  { id: "giggles", name: "Giggles and Gizmos", students: ["Levi", "Zoe", "Tiernan", "Tyler", "Nico"] },
+  { id: "tinkertown", name: "Tinkertown Toys", students: ["Zenovia", "Miera", "Silas", "Teddy"] },
+  { id: "playmotion", name: "PlayMotion", students: ["Maggie", "Aria", "Vincent", "Evan", "Jace"] },
+  { id: "cranium", name: "Cranium Emporium", students: ["Django", "Keane", "Evangeline", "Tigo"] }
 ];
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const [gameState, setGameState] = useState({});
+  const [quarterData, setQuarterData] = useState({});
 
-  const currentQuarter =
-    localStorage.getItem("currentQuarter") || "1";
+  useEffect(() => {
+    const loadData = async () => {
+      const gameSnap = await getDoc(doc(db, "gameState", "main"));
+      if (gameSnap.exists()) {
+        setGameState(gameSnap.data());
+      }
+
+      let allQuarters = {};
+      for (let q = 1; q <= 4; q++) {
+        const snap = await getDoc(doc(db, "quarters", `Q${q}`));
+        if (snap.exists()) {
+          allQuarters[q] = snap.data();
+        }
+      }
+      setQuarterData(allQuarters);
+    };
+
+    loadData();
+  }, []);
 
   const quarterMap = {
-    "1": "Quarter One ❄️",
-    "2": "Quarter Two 🌷",
-    "3": "Quarter Three ☀️",
-    "4": "Quarter Four 🍁"
+    1: "Quarter One ❄️",
+    2: "Quarter Two 🌷",
+    3: "Quarter Three ☀️",
+    4: "Quarter Four 🍁"
   };
 
-  const getProfit = (storeId, quarter) => {
-    const released =
-      localStorage.getItem(`Q${quarter}-released`) === "true";
+  const getProfit = (storeId, q) => {
+    if (!gameState?.[`Q${q}Released`]) return "";
 
-    if (!released) return "";
-
-    const final =
-      Number(
-        localStorage.getItem(`${storeId}-Q${quarter}-finalRevenue`)
-      ) || 0;
-
-    const expenses =
-      Number(
-        localStorage.getItem(`${storeId}-Q${quarter}-expenses`)
-      ) || 0;
-
+    const stores = quarterData?.[q]?.stores || {};
+    const final = stores?.[storeId]?.finalRevenue || 0;
+    const expenses = stores?.[storeId]?.expenses || 0;
     const profit = final - expenses;
 
     return `$${profit.toLocaleString(undefined, {
@@ -74,59 +62,33 @@ export default function LandingPage() {
     let total = 0;
 
     for (let q = 1; q <= 4; q++) {
-      const released =
-        localStorage.getItem(`Q${q}-released`) === "true";
+      if (!gameState?.[`Q${q}Released`]) continue;
 
-      if (!released) continue;
-
-      const final =
-        Number(
-          localStorage.getItem(`${storeId}-Q${q}-finalRevenue`)
-        ) || 0;
-
-      const expenses =
-        Number(
-          localStorage.getItem(`${storeId}-Q${q}-expenses`)
-        ) || 0;
+      const stores = quarterData?.[q]?.stores || {};
+      const final = stores?.[storeId]?.finalRevenue || 0;
+      const expenses = stores?.[storeId]?.expenses || 0;
 
       total += final - expenses;
     }
 
-    return `$${total.toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    })}`;
+    return total;
   };
-const isGameComplete =
-  localStorage.getItem("Q4-released") === "true";
 
-let winnerName = "";
-let highestProfit = -Infinity;
+  const isGameComplete = gameState?.Q4Released === true;
 
-if (isGameComplete) {
-  STORES.forEach(store => {
-    let total = 0;
+  let winnerName = "";
+  let highestProfit = -Infinity;
 
-    for (let q = 1; q <= 4; q++) {
-      const final =
-        Number(
-          localStorage.getItem(`${store.id}-Q${q}-finalRevenue`)
-        ) || 0;
+  if (isGameComplete) {
+    STORES.forEach(store => {
+      const total = getTotalProfit(store.id);
+      if (total > highestProfit) {
+        highestProfit = total;
+        winnerName = store.name;
+      }
+    });
+  }
 
-      const expenses =
-        Number(
-          localStorage.getItem(`${store.id}-Q${q}-expenses`)
-        ) || 0;
-
-      total += final - expenses;
-    }
-
-    if (total > highestProfit) {
-      highestProfit = total;
-      winnerName = store.name;
-    }
-  });
-}
   const topRow = STORES.slice(0, 3);
   const bottomRow = STORES.slice(3, 6);
 
@@ -145,9 +107,7 @@ if (isGameComplete) {
             />
           </div>
 
-          <div style={styles.storeName}>
-            {store.name}
-          </div>
+          <div style={styles.storeName}>{store.name}</div>
 
           <div style={styles.studentList}>
             {store.students.map(name => (
@@ -155,7 +115,7 @@ if (isGameComplete) {
             ))}
           </div>
 
-          {[1, 2, 3, 4].map(q => (
+          {[1,2,3,4].map(q => (
             <div key={q} style={styles.profitRow}>
               <strong>Profit Q{q}:</strong>{" "}
               {getProfit(store.id, q)}
@@ -164,7 +124,10 @@ if (isGameComplete) {
 
           <div style={styles.totalProfitRow}>
             <strong>Total Profit:</strong>{" "}
-            {getTotalProfit(store.id)}
+            ${getTotalProfit(store.id).toLocaleString(undefined, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2
+            })}
           </div>
         </div>
       ))}
@@ -174,25 +137,22 @@ if (isGameComplete) {
   return (
     <div style={styles.pageWrapper}>
       <div style={styles.container}>
-        <h1 style={styles.banner}>
-          Toy Shop Battle
-        </h1>
+        <h1 style={styles.banner}>Toy Shop Battle</h1>
 
         <div style={styles.tracker}>
-  {isGameComplete ? (
-    <>
-      🎉 <strong>All Done!</strong>
-      <br />
-      🏆 Overall Winner:{" "}
-      <strong>{winnerName}</strong>
-    </>
-  ) : (
-    <>
-      Currently in:{" "}
-      <strong>{quarterMap[currentQuarter]}</strong>
-    </>
-  )}
-</div>
+          {isGameComplete ? (
+            <>
+              🎉 <strong>All Done!</strong>
+              <br />
+              🏆 Overall Winner: <strong>{winnerName}</strong>
+            </>
+          ) : (
+            <>
+              Currently in:{" "}
+              <strong>{quarterMap[gameState?.currentQuarter]}</strong>
+            </>
+          )}
+        </div>
 
         {renderRow(topRow)}
         {renderRow(bottomRow)}
@@ -213,23 +173,19 @@ if (isGameComplete) {
 const styles = {
   pageWrapper: {
     minHeight: "100vh",
-    background:
-      "linear-gradient(180deg, #d385ec 0%, #a3e7f0 100%)"
+    background: "linear-gradient(180deg, #d385ec 0%, #a3e7f0 100%)"
   },
-
   container: {
     maxWidth: "1200px",
     margin: "0 auto",
     padding: "60px 20px",
     textAlign: "center"
   },
-
   banner: {
     fontFamily: "Funkids",
     fontSize: "180px",
     marginBottom: "30px"
   },
-
   tracker: {
     fontSize: "26px",
     backgroundColor: "#fff8e1",
@@ -237,14 +193,12 @@ const styles = {
     borderRadius: "25px",
     marginBottom: "40px"
   },
-
   row: {
     display: "flex",
     justifyContent: "center",
     gap: "30px",
     marginBottom: "50px"
   },
-
   storeCard: {
     backgroundColor: "white",
     padding: "30px",
@@ -252,34 +206,26 @@ const styles = {
     width: "320px",
     boxShadow: "0 8px 20px rgba(0,0,0,0.1)"
   },
-
-  imageWrapper: {
-    cursor: "pointer"
-  },
-
+  imageWrapper: { cursor: "pointer" },
   storeImage: {
     width: "260px",
     borderRadius: "20px",
     marginBottom: "15px"
   },
-
   storeName: {
     fontWeight: "bold",
     fontFamily: "Funkids",
     fontSize: "40px",
     marginBottom: "15px"
   },
-
   studentList: {
     fontSize: "25px",
     marginBottom: "15px"
   },
-
   profitRow: {
     fontSize: "22px",
     marginBottom: "6px"
   },
-
   totalProfitRow: {
     fontSize: "24px",
     marginTop: "12px",
@@ -287,12 +233,10 @@ const styles = {
     borderTop: "2px solid #ddd",
     paddingTop: "10px"
   },
-
   teacherLinkWrapper: {
     marginTop: "60px",
     textAlign: "right"
   },
-
   teacherLink: {
     background: "none",
     border: "none",
