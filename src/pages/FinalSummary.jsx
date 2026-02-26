@@ -1,4 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import {
   LineChart,
   Line,
@@ -9,6 +10,16 @@ import {
   CartesianGrid,
   Legend
 } from "recharts";
+
+import { db } from "../firebase";
+import { doc, getDoc } from "firebase/firestore";
+
+const quarterMap = {
+  1: "Quarter One ❄️",
+  2: "Quarter Two 🌷",
+  3: "Quarter Three ☀️",
+  4: "Quarter Four 🎁"
+};
 
 const safeNumber = (v) => {
   const n = Number(v);
@@ -24,28 +35,50 @@ const formatMoney = (value) =>
     maximumFractionDigits: 2
   })}`;
 
-const quarterMap = {
-  1: "Quarter One ❄️",
-  2: "Quarter Two 🌷",
-  3: "Quarter Three ☀️",
-  4: "Quarter Four 🎁"
-};
-
 export default function FinalSummary() {
   const { shopId } = useParams();
   const navigate = useNavigate();
 
-  const allData = [1, 2, 3, 4].map(q => {
-    const revenueRaw = safeNumber(
-      localStorage.getItem(`${shopId}-Q${q}-finalRevenue`)
-    );
+  const [quarterData, setQuarterData] = useState({});
 
-    const expensesRaw = safeNumber(
-      localStorage.getItem(`${shopId}-Q${q}-expenses`)
-    );
+  useEffect(() => {
+    const loadData = async () => {
+      let allData = {};
+
+      for (let q = 1; q <= 4; q++) {
+        const snap = await getDoc(
+          doc(db, "quarters", `Q${q}`)
+        );
+
+        if (snap.exists()) {
+          allData[q] = snap.data();
+        }
+      }
+
+      setQuarterData(allData);
+    };
+
+    loadData();
+  }, []);
+
+  const allData = [1, 2, 3, 4].map((q) => {
+    const stores =
+      quarterData?.[q]?.stores || {};
+
+    const revenueRaw =
+      safeNumber(
+        stores?.[shopId]?.finalRevenue
+      );
+
+    const expensesRaw =
+      safeNumber(
+        stores?.[shopId]?.expenses
+      );
 
     const revenue = roundMoney(revenueRaw);
-    const profit = roundMoney(revenueRaw - expensesRaw);
+    const profit = roundMoney(
+      revenueRaw - expensesRaw
+    );
 
     return {
       quarter: quarterMap[q],
@@ -69,7 +102,6 @@ export default function FinalSummary() {
           🎉 Final Year Summary 🎉
         </h1>
 
-        {/* Quarter Breakdown */}
         <div style={styles.card}>
           <h2 style={styles.sectionTitle}>
             Year Breakdown
@@ -81,7 +113,10 @@ export default function FinalSummary() {
               <span>{formatMoney(q.Revenue)}</span>
               <span
                 style={{
-                  color: q.Profit >= 0 ? "green" : "red"
+                  color:
+                    q.Profit >= 0
+                      ? "green"
+                      : "red"
                 }}
               >
                 {formatMoney(q.Profit)}
@@ -90,7 +125,6 @@ export default function FinalSummary() {
           ))}
         </div>
 
-        {/* Graph */}
         <div style={styles.card}>
           <h2 style={styles.sectionTitle}>
             Revenue & Profit Over Time 📈
@@ -127,7 +161,6 @@ export default function FinalSummary() {
           </ResponsiveContainer>
         </div>
 
-        {/* Totals */}
         <div style={styles.card}>
           <h2 style={styles.sectionTitle}>
             Year Totals
@@ -142,7 +175,10 @@ export default function FinalSummary() {
             <span>Total Profit</span>
             <strong
               style={{
-                color: totalProfit >= 0 ? "green" : "red"
+                color:
+                  totalProfit >= 0
+                    ? "green"
+                    : "red"
               }}
             >
               {formatMoney(totalProfit)}
@@ -183,7 +219,8 @@ const styles = {
     padding: "35px",
     borderRadius: "30px",
     marginBottom: "35px",
-    boxShadow: "0 8px 20px rgba(0,0,0,0.1)"
+    boxShadow:
+      "0 8px 20px rgba(0,0,0,0.1)"
   },
   sectionTitle: {
     fontSize: "28px",
