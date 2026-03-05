@@ -33,7 +33,6 @@ export function calculateMarket(teams, quarter) {
 
   const results = {};
 
-  // Initialize results
   teams.forEach((team) => {
     results[team.id] = {
       baseRevenue: 0,
@@ -54,15 +53,12 @@ export function calculateMarket(teams, quarter) {
     teams.forEach((team) => {
       const teamOrder = team.orders[toy.id] || 0;
 
-      // ---- DEMAND SPLIT ----
-
+      // --- DEMAND SPLIT ---
       const share = teamOrder / adjustedTotalSupply;
 
-      // Step 1: base sold (rounded)
       let baseSold = Math.round(share * toy.baseDemand);
       baseSold = Math.min(baseSold, teamOrder);
 
-      // Step 2: fit multiplier applied AFTER base rounding
       const fitMultiplier =
         FIT_MATRIX[toy.id]?.[team.id] || 1;
 
@@ -71,40 +67,21 @@ export function calculateMarket(teams, quarter) {
 
       results[team.id].sold[toy.id] = actualSold;
 
-      if (team.id === "imagination" && currentQuarter === "2") {
-  console.log(toy.id, {
-    share,
-    baseDemand: toy.baseDemand,
-    baseSold,
-    fitMultiplier,
-    actualSold
-  });
-}
-      // ---- REVENUE CALCULATION ----
-
-      // Per-toy rounding (Excel-style display rounding)
+      // --- REVENUE ---
       const baseRevenue = round2(
         actualSold * toy.sellingPrice
       );
-
-
+console.log(team.id, team.buildingMultiplier, team.laborMultiplier);
+      // 🔥 FIX: use multipliers passed from Firebase
       const buildingMultiplier =
-        Number(
-          localStorage.getItem(
-            `${team.id}-Q${currentQuarter}-buildingMultiplier`
-          )
-        ) || 1;
+        team.buildingMultiplier || 1;
 
       const buildingRevenue = round2(
         baseRevenue * buildingMultiplier
       );
 
       const laborMultiplier =
-        Number(
-          localStorage.getItem(
-            `${team.id}-Q${currentQuarter}-laborMultiplier`
-          )
-        ) || 1;
+        team.laborMultiplier || 1;
 
       const finalRevenue = round2(
         buildingRevenue * laborMultiplier
@@ -116,16 +93,13 @@ export function calculateMarket(teams, quarter) {
     });
   });
 
-  // Final rounding of totals
   teams.forEach((team) => {
     results[team.id].baseRevenue = round2(
       results[team.id].baseRevenue
     );
-
     results[team.id].buildingRevenue = round2(
       results[team.id].buildingRevenue
     );
-
     results[team.id].finalRevenue = round2(
       results[team.id].finalRevenue
     );
