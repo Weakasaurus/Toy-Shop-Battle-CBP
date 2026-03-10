@@ -129,6 +129,9 @@ export default function ResultsPage() {
 
   const profit = final - expenses;
 
+  const toyData =
+  stores?.[shopId]?.toys || {};
+  
   const graphData = releasedQuarters.map((q) => {
     const s =
       quarterData?.[q]?.stores?.[shopId] || {};
@@ -206,7 +209,28 @@ export default function ResultsPage() {
             <strong>{formatMoney(profit)}</strong>
           </div>
         </div>
+{/* Toy Breakdown */}
+<div style={styles.card}>
+  <h2>Toy Sales Breakdown</h2>
 
+  {Object.keys(toyData).length === 0 ? (
+    <p>No toy data recorded for this quarter.</p>
+  ) : (
+    Object.entries(toyData).map(([toyName, data]) => {
+      const bought = safeNumber(data.bought);
+      const sold = safeNumber(data.sold);
+
+      return (
+        <div key={toyName} style={styles.row}>
+          <span>
+            {toyName} (Bought: {bought})
+          </span>
+          <strong>Sold: {sold}</strong>
+        </div>
+      );
+    })
+  )}
+</div>
         {/* Graph */}
         <div style={styles.card}>
           <h2>Revenue & Profit Over Time</h2>
