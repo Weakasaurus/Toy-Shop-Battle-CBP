@@ -7,7 +7,7 @@ const BUSINESS_BUDGET = 20000;
 
 const RENT_OPTIONS = [
   { label: "Smaller location", cost: 4000, multiplier: 0.9 },
-  { label: "Keep current location", cost: 9000, multiplier: 1.0 },
+  { label: "Medium location", cost: 9000, multiplier: 1.0 },
   { label: "Add funhouse expansion", cost: 12000, multiplier: 1.1 }
 ];
 
