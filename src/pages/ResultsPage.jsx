@@ -180,7 +180,6 @@ export default function ResultsPage() {
           </div>
         </div>
 
-        {/* Toy Breakdown */}
 {/* Toy Breakdown */}
 <div style={styles.card}>
   <h2>Toy Sales Breakdown</h2>
@@ -193,7 +192,6 @@ export default function ResultsPage() {
       const soldAmount = safeNumber(sold[toyId]);
       const leftover = bought - soldAmount;
 
-      // Find toy info from quarter data
       const toyList = {
         1: require("../data/toys").Q1_TOYS,
         2: require("../data/q2Toys").Q2_TOYS,
@@ -205,26 +203,47 @@ export default function ResultsPage() {
         toyList[viewingQuarter].find(t => t.id === toyId) || {};
 
       const toyName = toyInfo.name || toyId;
-      const price = safeNumber(toyInfo.price);
+      const unitPrice = safeNumber(toyInfo.unitPrice);
+      const sellingPrice = safeNumber(toyInfo.sellingPrice);
 
-      const revenue = soldAmount * price;
-      const cost = leftover * price;
+      const revenue = soldAmount * sellingPrice;
+      const totalCost = bought * unitPrice;
+      const profit = revenue - totalCost;
 
       return (
-        <div key={toyId} style={{ marginBottom: "15px" }}>
-          <div style={styles.row}>
-            <span>
-              {toyName} — Bought: {bought} (${price}) | Sold: {soldAmount} (${revenue})
-            </span>
-            <strong>
-              {leftover === 0
-                ? `Profit: ${formatMoney(revenue)}`
-                : `Cost: ${formatMoney(cost)}`}
-            </strong>
+        <div
+          key={toyId}
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            marginBottom: "25px"
+          }}
+        >
+          {/* LEFT SIDE */}
+          <div style={{ textAlign: "left" }}>
+            <div style={{ fontWeight: "bold", fontSize: "22px" }}>
+              {toyName}
+            </div>
+
+            <div>
+              Bought: {bought} ({formatMoney(unitPrice)}) | Sold: {soldAmount} ({formatMoney(revenue)})
+            </div>
           </div>
 
-          <div style={{ textAlign: "left", fontSize: "16px" }}>
-            Leftover: {leftover}
+          {/* RIGHT SIDE */}
+          <div style={{ textAlign: "right" }}>
+            <div
+              style={{
+                fontWeight: "bold",
+                color: profit >= 0 ? "green" : "red"
+              }}
+            >
+              {profit >= 0
+                ? `Profit: ${formatMoney(profit)}`
+                : `Cost: ${formatMoney(Math.abs(profit))}`}
+            </div>
+
+            <div>Leftover: {leftover}</div>
           </div>
         </div>
       );
