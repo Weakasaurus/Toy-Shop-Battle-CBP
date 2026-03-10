@@ -206,8 +206,8 @@ export default function ResultsPage() {
       const unitPrice = safeNumber(toyInfo.unitPrice);
       const sellingPrice = safeNumber(toyInfo.sellingPrice);
 
-      const revenue = soldAmount * sellingPrice;
       const totalCost = bought * unitPrice;
+      const revenue = soldAmount * sellingPrice;
       const profit = revenue - totalCost;
 
       return (
@@ -226,7 +226,8 @@ export default function ResultsPage() {
             </div>
 
             <div>
-              Bought: {bought} ({formatMoney(unitPrice)}) | Sold: {soldAmount} ({formatMoney(revenue)})
+              Bought: {bought} ({formatMoney(totalCost)}) | 
+              Sold: {soldAmount} ({formatMoney(revenue)})
             </div>
           </div>
 
