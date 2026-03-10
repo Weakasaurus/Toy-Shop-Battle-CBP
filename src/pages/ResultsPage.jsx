@@ -48,13 +48,10 @@ export default function ResultsPage() {
     }
   }, [shopId, navigate]);
 
-  /* 🔄 Load game state + quarter data */
+  /* 🔄 Load Data */
   useEffect(() => {
     const loadData = async () => {
-      const gameSnap = await getDoc(
-        doc(db, "gameState", "main")
-      );
-
+      const gameSnap = await getDoc(doc(db, "gameState", "main"));
       if (!gameSnap.exists()) return;
 
       const data = gameSnap.data();
@@ -73,9 +70,7 @@ export default function ResultsPage() {
 
       let allData = {};
       for (let q = 1; q <= 4; q++) {
-        const snap = await getDoc(
-          doc(db, "quarters", `Q${q}`)
-        );
+        const snap = await getDoc(doc(db, "quarters", `Q${q}`));
         if (snap.exists()) {
           allData[q] = snap.data();
         }
@@ -97,9 +92,7 @@ export default function ResultsPage() {
     return (
       <div style={styles.wrapper}>
         <div style={styles.container}>
-          <h1 style={styles.title}>
-            Results Not Released Yet
-          </h1>
+          <h1 style={styles.title}>Results Not Released Yet</h1>
           <button
             style={styles.button}
             onClick={() => navigate(`/hub/${shopId}`)}
@@ -111,47 +104,34 @@ export default function ResultsPage() {
     );
   }
 
-  const stores =
-    quarterData?.[viewingQuarter]?.stores || {};
+  const stores = quarterData?.[viewingQuarter]?.stores || {};
+  const store = stores?.[shopId] || {};
 
-  const base = safeNumber(
-    stores?.[shopId]?.baseRevenue
-  );
-  const building = safeNumber(
-    stores?.[shopId]?.buildingRevenue
-  );
-  const final = safeNumber(
-    stores?.[shopId]?.finalRevenue
-  );
-  const expenses = safeNumber(
-    stores?.[shopId]?.expenses
-  );
-
+  const base = safeNumber(store.baseRevenue);
+  const building = safeNumber(store.buildingRevenue);
+  const final = safeNumber(store.finalRevenue);
+  const expenses = safeNumber(store.expenses);
   const profit = final - expenses;
 
-  const toyData =
-  stores?.[shopId]?.toys || {};
-  
-  const graphData = releasedQuarters.map((q) => {
-    const s =
-      quarterData?.[q]?.stores?.[shopId] || {};
+  const orders = store.orders || {};
+  const sold = store.sold || {};
 
+  const graphData = releasedQuarters.map((q) => {
+    const s = quarterData?.[q]?.stores?.[shopId] || {};
     const revenue = safeNumber(s.finalRevenue);
     const exp = safeNumber(s.expenses);
 
     return {
       quarter: quarterMap[q],
       Revenue: Math.round(revenue * 100) / 100,
-      Profit:
-        Math.round((revenue - exp) * 100) / 100
+      Profit: Math.round((revenue - exp) * 100) / 100
     };
   });
 
   const switchQuarter = async (q) => {
-    await updateDoc(
-      doc(db, "gameState", "main"),
-      { viewingQuarter: q }
-    );
+    await updateDoc(doc(db, "gameState", "main"), {
+      viewingQuarter: q
+    });
     setViewingQuarter(q);
   };
 
@@ -169,9 +149,7 @@ export default function ResultsPage() {
               key={q}
               style={{
                 ...styles.switchButton,
-                ...(q === viewingQuarter
-                  ? styles.activeSwitch
-                  : {})
+                ...(q === viewingQuarter ? styles.activeSwitch : {})
               }}
               onClick={() => switchQuarter(q)}
             >
@@ -182,14 +160,6 @@ export default function ResultsPage() {
 
         {/* Financial Breakdown */}
         <div style={styles.card}>
-          <div style={styles.row}>
-            <span>Base Revenue</span>
-            <strong>{formatMoney(base)}</strong>
-          </div>
-          <div style={styles.row}>
-            <span>Building Revenue</span>
-            <strong>{formatMoney(building)}</strong>
-          </div>
           <div style={styles.row}>
             <span>Final Revenue</span>
             <strong>{formatMoney(final)}</strong>
@@ -209,28 +179,31 @@ export default function ResultsPage() {
             <strong>{formatMoney(profit)}</strong>
           </div>
         </div>
-{/* Toy Breakdown */}
-<div style={styles.card}>
-  <h2>Toy Sales Breakdown</h2>
 
-  {Object.keys(toyData).length === 0 ? (
-    <p>No toy data recorded for this quarter.</p>
-  ) : (
-    Object.entries(toyData).map(([toyName, data]) => {
-      const bought = safeNumber(data.bought);
-      const sold = safeNumber(data.sold);
+        {/* Toy Breakdown */}
+        <div style={styles.card}>
+          <h2>Toy Sales Breakdown</h2>
 
-      return (
-        <div key={toyName} style={styles.row}>
-          <span>
-            {toyName} (Bought: {bought})
-          </span>
-          <strong>Sold: {sold}</strong>
+          {Object.keys(orders).length === 0 ? (
+            <p>No toy data recorded for this quarter.</p>
+          ) : (
+            Object.keys(orders).map((toyId) => {
+              const bought = safeNumber(orders[toyId]);
+              const soldAmount = safeNumber(sold[toyId]);
+              const leftover = bought - soldAmount;
+
+              return (
+                <div key={toyId} style={styles.row}>
+                  <span>
+                    {toyId} — Bought: {bought} | Sold: {soldAmount}
+                  </span>
+                  <strong>Leftover: {leftover}</strong>
+                </div>
+              );
+            })
+          )}
         </div>
-      );
-    })
-  )}
-</div>
+
         {/* Graph */}
         <div style={styles.card}>
           <h2>Revenue & Profit Over Time</h2>
@@ -266,9 +239,7 @@ export default function ResultsPage() {
 
         <button
           style={styles.button}
-          onClick={() =>
-            navigate(`/hub/${shopId}`)
-          }
+          onClick={() => navigate(`/hub/${shopId}`)}
         >
           Back to Hub
         </button>
@@ -280,8 +251,7 @@ export default function ResultsPage() {
 const styles = {
   wrapper: {
     minHeight: "100vh",
-    background:
-      "linear-gradient(180deg, #d385ec 0%, #a3e7f0 100%)"
+    background: "linear-gradient(180deg, #d385ec 0%, #a3e7f0 100%)"
   },
   container: {
     maxWidth: "1000px",
