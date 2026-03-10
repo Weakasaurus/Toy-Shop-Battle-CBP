@@ -161,6 +161,15 @@ export default function ShopHub() {
         </div>
 
         <div style={styles.buttons}>
+
+          {/* 🏠 Go Home Button */}
+          <button
+            style={styles.home}
+            onClick={() => navigate("/")}
+          >
+            🏠 Go Home
+          </button>
+
           {/* Strategy Stage */}
           {strategyOpen && (
             <button
@@ -283,5 +292,15 @@ const styles = {
     padding: "20px",
     fontFamily: "Funkids",
     fontSize: "26px"
-  }
+  },
+
+  home: {
+  padding: "18px",
+  fontFamily: "Funkids",
+  fontSize: "22px",
+  borderRadius: "20px",
+  backgroundColor: "#ffcc66",
+  border: "none",
+  cursor: "pointer"
+},
 };
