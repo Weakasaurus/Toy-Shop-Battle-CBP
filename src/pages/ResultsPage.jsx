@@ -181,28 +181,56 @@ export default function ResultsPage() {
         </div>
 
         {/* Toy Breakdown */}
-        <div style={styles.card}>
-          <h2>Toy Sales Breakdown</h2>
+{/* Toy Breakdown */}
+<div style={styles.card}>
+  <h2>Toy Sales Breakdown</h2>
 
-          {Object.keys(orders).length === 0 ? (
-            <p>No toy data recorded for this quarter.</p>
-          ) : (
-            Object.keys(orders).map((toyId) => {
-              const bought = safeNumber(orders[toyId]);
-              const soldAmount = safeNumber(sold[toyId]);
-              const leftover = bought - soldAmount;
+  {Object.keys(orders).length === 0 ? (
+    <p>No toy data recorded for this quarter.</p>
+  ) : (
+    Object.keys(orders).map((toyId) => {
+      const bought = safeNumber(orders[toyId]);
+      const soldAmount = safeNumber(sold[toyId]);
+      const leftover = bought - soldAmount;
 
-              return (
-                <div key={toyId} style={styles.row}>
-                  <span>
-                    {toyId} — Bought: {bought} | Sold: {soldAmount}
-                  </span>
-                  <strong>Leftover: {leftover}</strong>
-                </div>
-              );
-            })
-          )}
+      // Find toy info from quarter data
+      const toyList = {
+        1: require("../data/toys").Q1_TOYS,
+        2: require("../data/q2Toys").Q2_TOYS,
+        3: require("../data/q3Toys").Q3_TOYS,
+        4: require("../data/q4Toys").Q4_TOYS
+      };
+
+      const toyInfo =
+        toyList[viewingQuarter].find(t => t.id === toyId) || {};
+
+      const toyName = toyInfo.name || toyId;
+      const price = safeNumber(toyInfo.price);
+
+      const revenue = soldAmount * price;
+      const cost = leftover * price;
+
+      return (
+        <div key={toyId} style={{ marginBottom: "15px" }}>
+          <div style={styles.row}>
+            <span>
+              {toyName} — Bought: {bought} (${price}) | Sold: {soldAmount} (${revenue})
+            </span>
+            <strong>
+              {leftover === 0
+                ? `Profit: ${formatMoney(revenue)}`
+                : `Cost: ${formatMoney(cost)}`}
+            </strong>
+          </div>
+
+          <div style={{ textAlign: "left", fontSize: "16px" }}>
+            Leftover: {leftover}
+          </div>
         </div>
+      );
+    })
+  )}
+</div>
 
         {/* Graph */}
         <div style={styles.card}>
