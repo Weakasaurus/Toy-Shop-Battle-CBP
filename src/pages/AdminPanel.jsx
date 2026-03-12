@@ -69,6 +69,49 @@ export default function AdminPanel() {
     loadData();
   }, []);
 
+  /* ---------------- Q2 INVENTORY ADJUSTMENT ---------------- */
+
+  const subtractSpecificInventoryQ2 = async () => {
+    const quarterRef = doc(db, "quarters", "Q2");
+    const snap = await getDoc(quarterRef);
+    if (!snap.exists()) return;
+
+    const data = snap.data();
+    const stores = data?.stores || {};
+
+    const adjustments = {
+      imagination: "are-you-ready-for-a-pet",
+      giggles: "animating-animals",
+      tinkertown: "animating-animals",
+      playmotion: "are-you-ready-for-a-pet"
+    };
+
+    const updatedStores = { ...stores };
+
+    Object.keys(adjustments).forEach((shop) => {
+      const toyId = adjustments[shop];
+      const currentAmount =
+        Number(stores?.[shop]?.orders?.[toyId]) || 0;
+
+      const newAmount = Math.max(currentAmount - 100, 0);
+
+      updatedStores[shop] = {
+        ...updatedStores[shop],
+        orders: {
+          ...stores?.[shop]?.orders,
+          [toyId]: newAmount
+        }
+      };
+    });
+
+    await updateDoc(quarterRef, {
+      stores: updatedStores
+    });
+
+    alert("Q2 inventory reduced successfully.");
+    loadData();
+  };
+
   /* ---------------- RESET ---------------- */
 
   const resetSimulation = async () => {
@@ -196,6 +239,14 @@ export default function AdminPanel() {
           🔄 Reset Simulation
         </button>
 
+        {/* 🔴 Q2 Adjustment Button */}
+        <button
+          onClick={subtractSpecificInventoryQ2}
+          style={{ marginLeft: 10 }}
+        >
+          Subtract 100 (Q2 Only)
+        </button>
+
         {Object.entries(QUARTERS).map(([quarter, toys]) => {
           const data = quarterData[quarter] || {};
           const stores = data?.stores || {};
@@ -227,6 +278,8 @@ export default function AdminPanel() {
                   Recalculate Market
                 </button>
               </div>
+
+              {/* Financial Summary + Toy Table unchanged */}
 
               {/* Financial Summary */}
               <table style={styles.table}>
