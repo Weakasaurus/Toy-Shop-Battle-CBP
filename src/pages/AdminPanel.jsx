@@ -80,10 +80,10 @@ export default function AdminPanel() {
     const stores = data?.stores || {};
 
     const adjustments = {
-      imagination: "are-you-ready-for-a-pet",
+      imagination: "pet",
       giggles: "animating-animals",
       tinkertown: "animating-animals",
-      playmotion: "are-you-ready-for-a-pet"
+      playmotion: "pet"
     };
 
     const updatedStores = { ...stores };
