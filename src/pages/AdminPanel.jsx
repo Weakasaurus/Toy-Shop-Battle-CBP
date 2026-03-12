@@ -81,8 +81,6 @@ export default function AdminPanel() {
 
     const adjustments = {
       imagination: "pet",
-      giggles: "animating-animals",
-      tinkertown: "animating-animals",
       playmotion: "pet"
     };
 
