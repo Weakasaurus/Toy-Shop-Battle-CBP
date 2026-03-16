@@ -109,7 +109,38 @@ export default function AdminPanel() {
     alert("Q2 inventory reduced successfully.");
     loadData();
   };
+  /* ---------------- FIX GIGGLES INVENTORY ---------------- */
 
+  const restoreGigglesInventory = async () => {
+    const quarterRef = doc(db, "quarters", "Q2");
+    const snap = await getDoc(quarterRef);
+
+    if (!snap.exists()) return;
+
+    const data = snap.data();
+    const stores = data?.stores || {};
+
+    const currentAmount =
+      Number(stores?.giggles?.orders?.["animating-animals"]) || 0;
+
+    const updatedStores = {
+      ...stores,
+      giggles: {
+        ...stores.giggles,
+        orders: {
+          ...stores.giggles.orders,
+          "animating-animals": currentAmount + 100
+        }
+      }
+    };
+
+    await updateDoc(quarterRef, {
+      stores: updatedStores
+    });
+
+    alert("Added 100 back to Giggles (Animating Animals).");
+    loadData();
+  };
   /* ---------------- RESET ---------------- */
 
   const resetSimulation = async () => {
@@ -244,7 +275,19 @@ export default function AdminPanel() {
         >
           Subtract 100 (Q2 Only)
         </button>
-
+        {/* 🔴 Q2 Adjustment Button */}
+        <button
+          onClick={subtractSpecificInventoryQ2}
+          style={{ marginLeft: 10 }}
+        >
+          Subtract 100 (Q2 Only)
+        </button>
+                <button
+          onClick={restoreGigglesInventory}
+          style={{ marginLeft: 10 }}
+        >
+          Fix Giggles Inventory (+100)
+        </button>
         {Object.entries(QUARTERS).map(([quarter, toys]) => {
           const data = quarterData[quarter] || {};
           const stores = data?.stores || {};
