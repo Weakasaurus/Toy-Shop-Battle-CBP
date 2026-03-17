@@ -160,34 +160,42 @@ export default function PurchasePage() {
     let totalRevenue = 0;
     let totalProfit = 0;
 
-    Object.keys(orders).forEach((toyId) => {
-      const toy = TOYS.find((t) => t.id === toyId);
-      if (!toy) return;
+Object.keys(orders).forEach((toyId) => {
+  const toy = TOYS.find((t) => t.id === toyId);
+  if (!toy) return;
 
-      const yourOrders = safeNumber(orders[toyId]);
-      const totalMarket = marketTotals[toyId] || 0;
+  const yourOrders = safeNumber(orders[toyId]);
+  const totalMarket = marketTotals[toyId] || 0;
 
-      let estimatedSold = 0;
+  let estimatedSold = 0;
 
-      if (totalMarket > 0) {
-        const share = yourOrders / totalMarket;
-        estimatedSold = share * toy.baseDemand;
-      }
+  if (totalMarket > 0) {
+    const share = yourOrders / totalMarket;
+    estimatedSold = share * toy.baseDemand;
+  }
 
-      estimatedSold = Math.min(estimatedSold, yourOrders);
+  // don't exceed what you ordered
+  estimatedSold = Math.min(estimatedSold, yourOrders);
 
-      const revenue =
-        estimatedSold * safeNumber(toy.sellingPrice);
+  // 🔥 round sold amount (cleaner numbers)
+  estimatedSold = Math.round(estimatedSold);
 
-      const cost =
-        yourOrders * safeNumber(toy.unitPrice);
+  const revenue =
+    estimatedSold * safeNumber(toy.sellingPrice);
 
-      totalRevenue += revenue;
-      totalProfit += revenue - cost;
-    });
+  const cost =
+    yourOrders * safeNumber(toy.unitPrice);
 
-    setPredictedRevenue(Math.round(totalRevenue * 100) / 100);
-    setEstimatedProfit(Math.round(totalProfit * 100) / 100);
+  totalRevenue += revenue;
+  totalProfit += revenue - cost;
+});
+
+// 🔥 include business expenses
+totalProfit -= safeNumber(businessExpenses);
+
+// 🔥 round final numbers
+setPredictedRevenue(Math.round(totalRevenue * 100) / 100);
+setEstimatedProfit(Math.round(totalProfit * 100) / 100);
   }, [orders, liveStores, currentQuarter, gameState]);
 
   if (!gameState) return null;
