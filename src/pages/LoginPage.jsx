@@ -1,1 +1,104 @@
-import { useParams, useNavigate } from "react-router-dom"; import { useState } from "react"; const SHOP_PASSWORDS = { imagination: "coach", toytopia: "toy123", giggles: "1212", tinkertown: "tink123", playmotion: "play123", cranium: "cran123" }; export default function LoginPage() { const { shopId } = useParams(); const navigate = useNavigate(); const [password, setPassword] = useState(""); const handleLogin = () => { if (SHOP_PASSWORDS[shopId] === password) { sessionStorage.setItem("authenticatedShop", shopId); navigate(`/hub/${shopId}`); } else { alert("Incorrect password"); } }; return ( <div style={styles.wrapper}> <div style={styles.card}> <h1 style={styles.title}>Welcome</h1> <p style={styles.subtitle}> Enter your shop password to continue </p> <input type="password" placeholder="Enter password" value={password} onChange={(e) => setPassword(e.target.value)} style={styles.input} /> <div style={styles.buttonRow}> <button style={styles.button} onClick={handleLogin} > Enter Shop </button> <button style={styles.button} onClick={() => navigate("/")} > Back to Home </button> </div> </div> </div> ); } const styles = { wrapper: { minHeight: "100vh", background: "linear-gradient(180deg, #d385ec 0%, #a3e7f0 100%)", display: "flex", justifyContent: "center", alignItems: "center" }, card: { background: "white", padding: "50px", borderRadius: "30px", width: "400px", textAlign: "center", boxShadow: "0 10px 30px rgba(0,0,0,0.1)" }, title: { fontFamily: "Funkids", fontSize: "48px", marginBottom: "10px" }, subtitle: { fontSize: "18px", marginBottom: "30px" }, input: { width: "100%", padding: "12px", fontSize: "16px", borderRadius: "12px", border: "1px solid #ccc", marginBottom: "25px" }, buttonRow: { display: "flex", flexDirection: "column", gap: "12px" }, button: { padding: "14px", borderRadius: "25px", border: "none", backgroundColor: "#ffcc66", fontFamily: "Funkids", fontSize: "20px", cursor: "pointer" } };
+import { useParams, useNavigate } from "react-router-dom";
+import { useState } from "react";
+
+const SHOP_PASSWORDS = {
+  imagination: "rainbow123",
+  toytopia: "toys4fun",
+  giggles: "haha123",
+  tinkertown: "buildit",
+  playmotion: "letsplay",
+  cranium: "bigbrain"
+};
+
+export default function LoginPage() {
+  const { shopId } = useParams();
+  const navigate = useNavigate();
+  const [password, setPassword] = useState("");
+
+  const handleLogin = () => {
+    if (SHOP_PASSWORDS[shopId] === password) {
+      sessionStorage.setItem("authenticatedShop", shopId);
+      navigate(`/hub/${shopId}`);
+    } else {
+      alert("Incorrect password");
+    }
+  };
+
+  return (
+    <div style={styles.wrapper}>
+      <div style={styles.card}>
+        <h1 style={styles.title}>Welcome</h1>
+        <p style={styles.subtitle}>
+          Enter your shop password to continue
+        </p>
+
+        <input
+          type="password"
+          placeholder="Enter password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          style={styles.input}
+        />
+
+        <div style={styles.buttonRow}>
+          <button style={styles.button} onClick={handleLogin}>
+            Enter Shop
+          </button>
+
+          <button style={styles.button} onClick={() => navigate("/")}>
+            Back to Home
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const styles = {
+  wrapper: {
+    minHeight: "100vh",
+    background: "linear-gradient(180deg, #d385ec 0%, #a3e7f0 100%)",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center"
+  },
+  card: {
+    background: "white",
+    padding: "50px",
+    borderRadius: "30px",
+    width: "400px",
+    textAlign: "center",
+    boxShadow: "0 10px 30px rgba(0,0,0,0.1)"
+  },
+  title: {
+    fontFamily: "Funkids",
+    fontSize: "48px",
+    marginBottom: "10px"
+  },
+  subtitle: {
+    fontSize: "18px",
+    marginBottom: "30px"
+  },
+  input: {
+    width: "100%",
+    padding: "12px",
+    fontSize: "16px",
+    borderRadius: "12px",
+    border: "1px solid #ccc",
+    marginBottom: "25px"
+  },
+  buttonRow: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "12px"
+  },
+  button: {
+    padding: "14px",
+    borderRadius: "25px",
+    border: "none",
+    backgroundColor: "#ffcc66",
+    fontFamily: "Funkids",
+    fontSize: "20px",
+    cursor: "pointer"
+  }
+};
