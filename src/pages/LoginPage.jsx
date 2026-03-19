@@ -2,9 +2,9 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useState } from "react";
 
 const SHOP_PASSWORDS = {
-  imagination: "rainbow123",
+  imagination: "coach",
   toytopia: "toys4fun",
-  giggles: "haha123",
+  giggles: "123123",
   tinkertown: "buildit",
   playmotion: "letsplay",
   cranium: "bigbrain"
